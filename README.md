@@ -25,13 +25,17 @@
 >
 > M1 已与设计稿并排比对通过，并用 `tools/verify-m1.py` 量化校验了 token 色彩、无 elevation、等宽数字。
 >
-> M2 已用真实点按走完整流程验证（`tools/verify-m2.ps1`）：首次引导 → 跳过 → 录入 → 变化量 → 撤销 → 设身高后 BMI 联动。
+> M2 已用真实点按走完整流程验证（`tools/verify-m2.ps1`）：首次引导 → 跳过 → 录入 → 变化量 → 设身高后 BMI 联动。
 >
-> M3 图表为自绘 Canvas：区间解析 / 聚合（当日最低值锁定同一条记录）/ Y 轴整数刻度 / monotone cubic 平滑 / 视口滚动 / 点击气泡。手势方向判定用像素级比对验证（横向滑动差异 22876 像素、纵向滑动 0 像素）。
+> M3 图表为自绘 Canvas：区间解析 / 聚合（当日最低值锁定同一条记录）/ Y 轴整数刻度 / monotone cubic 平滑 / 点击气泡。横轴刻度按视图分类（日 `00:00–24:00`、周 `一–日`、月 `1/10/20/月末`、年 `1–12`），不再是一刀切的 5 个点。
 >
-> M4 列表与记录管理：首页历史区 + 「全部记录」弹窗 + 点击编辑 + 长按删除与撤销。1000 条列表实测 Missed Vsync 0。
+> M4 列表与记录管理：首页历史区 + 「全部记录」弹窗 + 点击编辑 + 左滑显示红色删除按钮（左滑本身不删除，必须再点一下）。
+> 首页历史区**不做**左滑，避免与页面纵向滚动打架；一次只允许一行处于划开状态。1000 条列表实测 Missed Vsync 0。
 >
 > M5 退化场景与打磨：空状态引导 + 插画、骨架屏、图表淡入淡出、目标达成脉冲、无障碍、字体 1.5× 适配。冷启动实测 1169–1212ms。
+>
+> M5 之后追加（产品逐轮反馈）：右下角悬浮「添加数据」按钮、日期栏箭头带底色表示可用性、目标卡片与概览卡片互换、新增整屏设置页（BMI 中国/WHO 标准、CSV 导入导出、清空数据）、自适应 App 图标。
+> release 包开启 R8，12.85 MB → **1.55 MB**；Room 的反射初始化已在真机可用的构建上实测通过。
 
 ## 开发工具（tools/）
 
@@ -87,27 +91,57 @@ export GRADLE_OPTS="-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7897 \
                     -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7897"
 
 ./gradlew assembleDebug          # 构建
-./gradlew testDebugUnitTest      # 单测
+./gradlew testDebugUnitTest      # 单测（123 个）
+./gradlew distRelease            # 出正式签名包 → dist/WeightDiary-<版本>.apk
 ```
 
 Android Studio 若同步失败，检查 `Settings → HTTP Proxy`。详见 [03 技术设计 · R2](docs/03-技术设计.md)。
+
+### 关于正式包
+
+release 开启了 R8（混淆 + 资源压缩），**12.85 MB → 1.55 MB**。
+
+> Room 的生成类是按类名反射查找的，开 R8 最容易在这一环翻车 ——
+> 每次改完混淆规则都应在真机或模拟器上实跑一遍「写入一条记录并读回」。
+
+`distRelease` 需要项目根的 `keystore.properties`（**不在版本库里**）：
+
+```properties
+storeFile=keystore/weightdiary-release.jks
+storePassword=…
+keyAlias=weightdiary
+keyPassword=…
+```
+
+文件不存在时构建不会失败，只是不做签名、出不了可安装的正式包 —— 这样别人 clone 下来照样能跑 `assembleDebug`。
+
+> **密钥库请单独备份。**丢了就再也发不了「同一个 App」的更新，只能换包名重来。
 
 ## 包结构
 
 ```
 com.weightdiary.app
-├─ WeightDiaryApp / MainActivity      ⚠️ MainActivity 目前是临时调试台，M1 会替换
-├─ di/AppContainer                    手写依赖容器（暂不引入 Hilt）
+├─ WeightDiaryApp / MainActivity      入口 + 整屏导航（首页 ⇄ 设置）+ 弹窗路由
+├─ di/AppContainer                    手写依赖容器（刻意不引入 Hilt）
 ├─ data/
 │   ├─ local/       Room：Entity / Dao / Database / Mappers
 │   ├─ prefs/       DataStore：ProfileStore
+│   ├─ backup/      RecordBackup：CSV 的 SAF 读写
 │   └─ repository/  WeightRepository
 ├─ domain/
-│   ├─ model/       WeightRecord · UserProfile · BmiLevel · BmiStandard · Metric
-│   └─ bmi/         BmiCalculator · BmiClassifier
-└─ ui/              （M1 开始填充）
+│   ├─ model/       WeightRecord · UserProfile · BmiLevel · BmiStandard · Metric · UnitSystem
+│   ├─ bmi/         BmiCalculator · BmiClassifier
+│   ├─ chart/       RangeResolver · Aggregator · ChartScaffolder · MonotoneCubic
+│   ├─ record/      RecordRows · RecordCsv
+│   └─ validation/  RecordValidator
+└─ ui/
+    ├─ theme/       设计 token（颜色 / 字号 / 间距，全走 CompositionLocal）
+    ├─ home/        首页：卡片、图表、历史区
+    ├─ settings/    设置（整屏）
+    ├─ sheet/       添加/编辑、个人资料、全部记录、首次引导
+    └─ common/      Formatters · NumberInput
 
-app/src/test/.../domain/bmi/   15 个单测
+app/src/test/   123 个单测（BMI 12 · 图表 51 · 记录行 7 · 校验 13 · CSV 12 · 数字输入 8 …）
 ```
 
 ## 关键约定
