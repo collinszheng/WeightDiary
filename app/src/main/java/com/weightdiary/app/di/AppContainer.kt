@@ -1,6 +1,7 @@
 package com.weightdiary.app.di
 
 import android.content.Context
+import com.weightdiary.app.data.backup.RecordBackup
 import com.weightdiary.app.data.local.WeightDatabase
 import com.weightdiary.app.data.prefs.ProfileStore
 import com.weightdiary.app.data.repository.WeightRepository
@@ -22,4 +23,6 @@ class AppContainer(context: Context) {
     val weightRepository: WeightRepository by lazy {
         WeightRepository(database.weightDao(), profileStore)
     }
+
+    val recordBackup: RecordBackup by lazy { RecordBackup(appContext) }
 }

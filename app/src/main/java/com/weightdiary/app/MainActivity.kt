@@ -3,7 +3,9 @@ package com.weightdiary.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.Scaffold
@@ -27,13 +29,17 @@ import com.weightdiary.app.ui.home.ActiveSheet
 import com.weightdiary.app.ui.home.HomeEvent
 import com.weightdiary.app.ui.home.HomeScreen
 import com.weightdiary.app.ui.home.HomeUiState
+import com.weightdiary.app.domain.record.RecordCsv
 import com.weightdiary.app.ui.home.HomeViewModel
 import com.weightdiary.app.ui.home.components.AddRecordFab
 import com.weightdiary.app.ui.sheet.AddRecordSheet
 import com.weightdiary.app.ui.sheet.AllRecordsSheet
 import com.weightdiary.app.ui.sheet.EditProfileSheet
 import com.weightdiary.app.ui.sheet.OnboardingSheet
+import com.weightdiary.app.ui.sheet.SettingsSheet
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -52,7 +58,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             WeightDiaryTheme {
                 val homeViewModel: HomeViewModel = viewModel(
-                    factory = HomeViewModel.factory(container.weightRepository),
+                    factory = HomeViewModel.factory(
+                        container.weightRepository,
+                        container.recordBackup,
+                    ),
                 )
                 val state by homeViewModel.uiState.collectAsStateWithLifecycle()
 
@@ -67,8 +76,15 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    // 设置页还没做，先只给一条提示，避免出现一个点了没反应的死按钮
-    val settingsComingSoon = stringResource(R.string.snack_settings_coming_soon)
+
+    // 导入导出走 SAF：不需要存储权限，用户自己决定文件存到哪 / 从哪读
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(RecordCsv.MIME_TYPE),
+    ) { uri -> uri?.let(viewModel::exportData) }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let(viewModel::importData) }
 
     // 一次性事件 → Snackbar。用 Channel 而不是 StateFlow，旋转屏幕不会重放
     LaunchedEffect(viewModel) {
@@ -95,6 +111,34 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
 
                 HomeEvent.RecordUpdated -> snackbarHostState.showSnackbar(
                     context.getString(R.string.snack_record_updated),
+                )
+
+                is HomeEvent.Exported -> snackbarHostState.showSnackbar(
+                    if (event.count == 0) {
+                        context.getString(R.string.snack_export_empty)
+                    } else {
+                        context.getString(R.string.snack_exported, event.count)
+                    },
+                )
+
+                is HomeEvent.Imported -> snackbarHostState.showSnackbar(
+                    if (event.skipped == 0) {
+                        context.getString(R.string.snack_imported, event.added)
+                    } else {
+                        context.getString(R.string.snack_imported_partial, event.added, event.skipped)
+                    },
+                )
+
+                HomeEvent.DataCleared -> snackbarHostState.showSnackbar(
+                    context.getString(R.string.snack_cleared),
+                )
+
+                is HomeEvent.DataFailed -> snackbarHostState.showSnackbar(
+                    if (event.exporting) {
+                        context.getString(R.string.snack_export_failed, event.reason)
+                    } else {
+                        context.getString(R.string.snack_import_failed, event.reason)
+                    },
                 )
             }
         }
@@ -130,7 +174,7 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             onShiftRange = viewModel::shiftRange,
             onRecordClick = { viewModel.startEdit(it) },
             onViewAllRecords = { viewModel.openSheet(ActiveSheet.ALL_RECORDS) },
-            onSettingsClick = { scope.launch { snackbarHostState.showSnackbar(settingsComingSoon) } },
+            onSettingsClick = { viewModel.openSheet(ActiveSheet.SETTINGS) },
         )
     }
 
@@ -175,6 +219,17 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             onEditCancel = viewModel::cancelEdit,
         )
 
+        ActiveSheet.SETTINGS -> SettingsSheet(
+            bmiStandard = state.bmiStandard,
+            recordCount = state.recordCount,
+            versionName = BuildConfig.VERSION_NAME,
+            onBmiStandardChange = viewModel::setBmiStandard,
+            onExport = { exportLauncher.launch(defaultBackupFileName()) },
+            onImport = { importLauncher.launch(arrayOf("*/*")) },
+            onClearData = viewModel::clearAllData,
+            onDismiss = viewModel::dismissSheet,
+        )
+
         ActiveSheet.EDIT_PROFILE -> EditProfileSheet(
             initialHeightCm = state.heightCm,
             initialTargetWeightKg = state.goal.targetWeightKg,
@@ -201,3 +256,7 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
         }
     }
 }
+
+/** 默认的备份文件名：体重日记-2026-10-03.csv */
+private fun defaultBackupFileName(): String =
+    "体重日记-" + DateTimeFormatter.ISO_LOCAL_DATE.format(LocalDate.now()) + ".csv"

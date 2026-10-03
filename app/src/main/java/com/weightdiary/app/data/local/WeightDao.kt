@@ -42,4 +42,13 @@ interface WeightDao {
 
     @Query("DELETE FROM weight_records WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Insert
+    suspend fun insertAll(entities: List<WeightRecordEntity>)
+
+    @Query("DELETE FROM weight_records")
+    suspend fun deleteAll()
+
+    @Query("SELECT * FROM weight_records ORDER BY measuredAt ASC")
+    suspend fun getAllOnce(): List<WeightRecordEntity>
 }

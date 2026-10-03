@@ -3,6 +3,7 @@ package com.weightdiary.app.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.weightdiary.app.data.backup.RecordBackup
 import com.weightdiary.app.data.repository.WeightRepository
 import com.weightdiary.app.domain.bmi.BmiCalculator
 import com.weightdiary.app.domain.bmi.BmiClassifier
@@ -10,6 +11,7 @@ import com.weightdiary.app.domain.chart.Aggregator
 import com.weightdiary.app.domain.chart.ChartScaffolder
 import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.chart.RangeResolver
+import com.weightdiary.app.domain.model.BmiStandard
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.model.UserProfile
 import com.weightdiary.app.domain.model.WeightRecord
@@ -28,7 +30,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
+class HomeViewModel(
+    private val repository: WeightRepository,
+    private val backup: RecordBackup,
+) : ViewModel() {
 
     private val selectedMetric = MutableStateFlow(Metric.WEIGHT)
     private val activeSheet = MutableStateFlow(ActiveSheet.NONE)
@@ -190,6 +195,40 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
         }
     }
 
+    // ─────────────── 设置 ───────────────
+
+    fun setBmiStandard(standard: BmiStandard) {
+        viewModelScope.launch { repository.setBmiStandard(standard) }
+    }
+
+    fun exportData(uri: android.net.Uri) {
+        viewModelScope.launch {
+            val records = repository.snapshot()
+            runCatching { backup.write(uri, records) }
+                .onSuccess { _events.send(HomeEvent.Exported(it)) }
+                .onFailure { _events.send(HomeEvent.DataFailed(exporting = true, reason = it.shortReason())) }
+        }
+    }
+
+    fun importData(uri: android.net.Uri) {
+        viewModelScope.launch {
+            runCatching {
+                val decoded = backup.read(uri)
+                val added = repository.importRows(decoded.rows)
+                added to decoded.skipped
+            }
+                .onSuccess { (added, skipped) -> _events.send(HomeEvent.Imported(added, skipped)) }
+                .onFailure { _events.send(HomeEvent.DataFailed(exporting = false, reason = it.shortReason())) }
+        }
+    }
+
+    fun clearAllData() {
+        viewModelScope.launch {
+            repository.clearAll()
+            _events.send(HomeEvent.DataCleared)
+        }
+    }
+
     // ─────────────── 删除 ───────────────
 
     /**
@@ -236,12 +275,14 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
     }
 
     companion object {
-        fun factory(repository: WeightRepository): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    HomeViewModel(repository) as T
-            }
+        fun factory(
+            repository: WeightRepository,
+            backup: RecordBackup,
+        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                HomeViewModel(repository, backup) as T
+        }
     }
 }
 
@@ -296,6 +337,7 @@ private fun buildState(
         level = bmi?.let { BmiClassifier.classify(it, profile.bmiStandard) },
         activeSheet = sheet,
         showOnboarding = !profile.onboardingCompleted,
+        bmiStandard = profile.bmiStandard,
         chart = buildChart(records, profile, metric, tab, anchor, earliestDate, height, zone, today),
         history = rows.take(HOME_HISTORY_LIMIT),
         allRecords = rows,
@@ -356,3 +398,7 @@ private fun goalProgress(profile: UserProfile, latest: WeightRecord?): Float? {
     if (span <= 0.0) return null
     return ((start - current) / span).coerceIn(0.0, 1.0).toFloat()
 }
+
+/** 异常信息可能很长（带类名），Snackbar 里只留一句能看懂的 */
+private fun Throwable.shortReason(): String =
+    (message ?: this::class.java.simpleName).take(60)

@@ -94,40 +94,34 @@ fun SettingsIconButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(22.dp)) {
+        // 三条带滑块的横线，也就是通常说的「tune」图标。
+        // 原先画的是八齿齿轮 + 内外两圈，22dp 下细节糊在一起，看着很吵。
+        Canvas(Modifier.size(20.dp)) {
             val stroke = 1.6.dp.toPx()
-            val c = center
-            val outer = size.minDimension * 0.32f
-            val toothLen = size.minDimension * 0.13f
-            val inner = size.minDimension * 0.12f
+            val knob = 2.4.dp.toPx()
+            // 每条线：纵向位置 + 滑块横向位置，刻意错开，不然像三条等长的横杠
+            val rows = listOf(0.25f to 0.68f, 0.5f to 0.34f, 0.75f to 0.58f)
 
-            // 八个齿：沿 45° 均匀辐射的短线，画得比齿圈粗一点，读起来才像齿轮
-            repeat(8) { i ->
-                val angle = i * (PI / 4).toFloat()
-                val dx = cos(angle)
-                val dy = sin(angle)
+            rows.forEach { (yRatio, xRatio) ->
+                val y = size.height * yRatio
                 drawLine(
                     color = colors.textPrimary,
-                    start = Offset(c.x + dx * outer, c.y + dy * outer),
-                    end = Offset(c.x + dx * (outer + toothLen), c.y + dy * (outer + toothLen)),
-                    strokeWidth = stroke * 1.8f,
+                    start = Offset(0f, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = stroke,
                     cap = StrokeCap.Round,
                 )
+                val cx = size.width * xRatio
+                // 滑块用底色填实再描边，线条才像是从它背后穿过
+                drawCircle(color = colors.background, radius = knob, center = Offset(cx, y))
+                drawCircle(
+                    color = colors.textPrimary,
+                    radius = knob,
+                    center = Offset(cx, y),
+                    style = Stroke(width = stroke),
+                )
             }
-            drawCircle(
-                color = colors.textPrimary,
-                radius = outer,
-                center = c,
-                style = Stroke(width = stroke),
-            )
-            drawCircle(
-                color = colors.textPrimary,
-                radius = inner,
-                center = c,
-                style = Stroke(width = stroke),
-            )
-        }
-    }
+        }    }
 }
 
 /**

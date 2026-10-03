@@ -5,6 +5,8 @@ import com.weightdiary.app.data.local.WeightRecordEntity
 import com.weightdiary.app.data.local.toDomain
 import com.weightdiary.app.data.local.toEntity
 import com.weightdiary.app.data.prefs.ProfileStore
+import com.weightdiary.app.domain.record.RecordCsv
+import com.weightdiary.app.domain.model.BmiStandard
 import com.weightdiary.app.domain.model.UserProfile
 import com.weightdiary.app.domain.model.WeightRecord
 import kotlinx.coroutines.flow.Flow
@@ -95,10 +97,50 @@ class WeightRepository(
         dao.deleteById(id)
     }
 
+    /**
+     * 从备份导入。**id 交给 Room 重新分配**，不沿用文件里的 id ——
+     * 导入到一个已有数据的库里时，沿用旧 id 会撞上现有记录。
+     *
+     * @return 实际写入的条数
+     */
+    suspend fun importRows(rows: List<RecordCsv.Row>): Int {
+        if (rows.isEmpty()) return 0
+        val now = Instant.now().toEpochMilli()
+        dao.insertAll(
+            rows.map { row ->
+                WeightRecordEntity(
+                    measuredAt = row.measuredAt.toEpochMilli(),
+                    weightKg = row.weightKg,
+                    bodyFatPercent = row.bodyFatPercent,
+                    note = row.note,
+                    // 原始创建时间已经无从考证，统一记成导入时刻
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            }
+        )
+        return rows.size
+    }
+
+    /**
+     * 取一份完整快照用于导出。
+     *
+     * 不用 UI 状态里的 allRecords：那是 RecordRow，丢了 createdAt / updatedAt。
+     * 导出的应当是原始记录。
+     */
+    suspend fun snapshot(): List<WeightRecord> = dao.getAllOnce().map(WeightRecordEntity::toDomain)
+
+    /** 清空所有记录。档案（身高 / 目标 / 标准）不动 */
+    suspend fun clearAll() {
+        dao.deleteAll()
+    }
+
     suspend fun setHeight(heightCm: Double?) = profileStore.setHeight(heightCm)
 
     suspend fun setTargetWeight(targetWeightKg: Double?, setAtWeightKg: Double?) =
         profileStore.setTargetWeight(targetWeightKg, setAtWeightKg)
+
+    suspend fun setBmiStandard(standard: BmiStandard) = profileStore.setBmiStandard(standard)
 
     suspend fun setOnboardingCompleted(completed: Boolean) =
         profileStore.setOnboardingCompleted(completed)

@@ -7,6 +7,7 @@ import com.weightdiary.app.domain.chart.XAxisLabels
 import com.weightdiary.app.domain.chart.XLabelKind
 import com.weightdiary.app.domain.chart.YAxis
 import com.weightdiary.app.domain.model.BmiLevel
+import com.weightdiary.app.domain.model.BmiStandard
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.record.RecordRow
 import java.time.Instant
@@ -17,6 +18,7 @@ enum class ActiveSheet {
     ADD_RECORD,
     EDIT_PROFILE,
     ALL_RECORDS,
+    SETTINGS,
 }
 
 /**
@@ -59,6 +61,9 @@ data class HomeUiState(
     val allRecords: List<RecordRow> = emptyList(),
     /** 正在编辑的记录。非空时 [ActiveSheet.ADD_RECORD] 进入编辑模式 */
     val editing: RecordRow? = null,
+
+    /** 「超重」的门槛由它决定：中国 24.0 / WHO 25.0 */
+    val bmiStandard: BmiStandard = BmiStandard.CHINA,
 ) {
     /** 首页历史区默认展示条数（设计规范 §4.5：默认展示最近 2–3 条） */
     val historyLimit: Int get() = HOME_HISTORY_LIMIT
@@ -110,4 +115,11 @@ sealed interface HomeEvent {
     data class RecordSaved(val id: Long, val weightKg: Double) : HomeEvent
     data object ProfileSaved : HomeEvent
     data object RecordUpdated : HomeEvent
+
+    /** 导出的条数。0 表示没有记录可导 */
+    data class Exported(val count: Int) : HomeEvent
+    data class Imported(val added: Int, val skipped: Int) : HomeEvent
+    data object DataCleared : HomeEvent
+    /** 读写出错（用户没选文件、文件不可读等） */
+    data class DataFailed(val exporting: Boolean, val reason: String) : HomeEvent
 }
