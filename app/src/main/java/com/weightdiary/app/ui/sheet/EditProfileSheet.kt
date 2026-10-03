@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,8 +48,11 @@ fun EditProfileSheet(
     initialTargetWeightKg: Double?,
     onDismiss: () -> Unit,
     onSave: (heightCm: Double?, targetWeightKg: Double?) -> Unit,
+    /** 从 BMI 卡点进来时给的说明：BMI 算不出来是因为缺身高 */
+    hint: String? = null,
 ) {
     val colors = WeightDiaryTheme.colors
+    val typo = WeightDiaryTheme.typography
     val dimen = WeightDiaryTheme.dimens
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -87,6 +91,15 @@ fun EditProfileSheet(
                 .padding(horizontal = dimen.pageHorizontal),
         ) {
             SheetTitle(stringResource(R.string.sheet_edit_profile_title))
+
+            if (hint != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = hint,
+                    style = typo.caption,
+                    color = colors.textSecondary,
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
 

@@ -76,11 +76,13 @@ fun CirclePlusButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 fun PencilIconButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = WeightDiaryTheme.colors
+    val dimen = WeightDiaryTheme.dimens
     val description = stringResource(R.string.action_edit_profile)
 
     Box(
         modifier = modifier
-            .size(32.dp)
+            // 触摸区撑到 48dp（视觉仍是 16dp 的铅笔）—— 设计规范 §8 要求触摸目标 ≥ 48×48dp
+            .size(dimen.minTouchTarget)
             .clip(CircleShape)
             .clickable(onClick = onClick, role = Role.Button)
             .semantics { contentDescription = description },

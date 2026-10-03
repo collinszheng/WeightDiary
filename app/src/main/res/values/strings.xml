@@ -80,6 +80,14 @@
     <string name="cd_record_row">%1$s，%2$s</string>
     <string name="cd_delete_record">删除这条记录</string>
 
+    <!-- 空状态与无障碍 -->
+    <string name="empty_no_records_title">还没有任何记录</string>
+    <string name="empty_no_records_hint">点右上角的 + 添加第一条体重</string>
+    <string name="loading">正在加载</string>
+    <string name="cd_chart">%1$s折线图，共 %2$d 个数据点</string>
+    <string name="cd_chart_empty">%1$s折线图，暂无数据</string>
+    <string name="cd_metric_card">%1$s：%2$s</string>
+
     <!-- 拼装片段 -->
     <string name="unit_kg">kg</string>
     <string name="unit_cm">cm</string>

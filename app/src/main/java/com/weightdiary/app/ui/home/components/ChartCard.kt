@@ -1,5 +1,7 @@
 package com.weightdiary.app.ui.home.components
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,8 +12,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,6 +57,8 @@ import kotlin.math.roundToInt
 fun ChartCard(
     chart: ChartUi,
     metric: Metric,
+    /** 一条记录都没有。用于区分「首次使用」与「这段时间没数据」两种空状态 */
+    hasAnyRecord: Boolean,
     onTabSelected: (ChartTab) -> Unit,
     onShiftRange: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -96,23 +102,43 @@ fun ChartCard(
                 Metric.BODY_FAT -> stringResource(R.string.unit_percent)
                 Metric.BMI -> ""
             }
-            WeightChart(
-                chart = chart,
-                yAxisTitle = stringResource(metric.axisTitleRes()),
-                // 主步长只从整数里选，所以四个刻度必然都是整数（设计规范 §4.4）
-                formatY = { value -> value.roundToInt().toString() },
-                formatX = { it.formatXLabel(chart.granularity) },
-                formatTooltip = { point ->
-                    val value = point.value.format1()
-                    val withUnit = if (unit.isEmpty()) value else "$value $unit"
-                    "$withUnit · ${point.time.formatShortDateTime()}"
-                },
-                goalLabel = chart.goalLine?.let { stringResource(R.string.goal_line, it.format1()) },
+            val axisTitle = stringResource(metric.axisTitleRes())
+            val chartDesc = stringResource(R.string.cd_chart, axisTitle, chart.points.size)
+            // 切换 Tab / 日期范围时淡出淡入（设计规范 §7，200ms）。
+            // 以 chart 本身作为 targetState：它是 data class，内容相同就不会触发动画。
+            Crossfade(
+                targetState = chart,
+                animationSpec = tween(durationMillis = 200),
+                label = "chart",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .semantics(mergeDescendants = true) { contentDescription = chartDesc },
+            ) { shown ->
+                WeightChart(
+                    chart = shown,
+                    yAxisTitle = axisTitle,
+                    // 主步长只从整数里选，所以四个刻度必然都是整数（设计规范 §4.4）
+                    formatY = { value -> value.roundToInt().toString() },
+                    formatX = { it.formatXLabel(shown.granularity) },
+                    formatTooltip = { point ->
+                        val value = point.value.format1()
+                        val withUnit = if (unit.isEmpty()) value else "$value $unit"
+                        "$withUnit · ${point.time.formatShortDateTime()}"
+                    },
+                    goalLabel = shown.goalLine?.let { stringResource(R.string.goal_line, it.format1()) },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        } else if (!hasAnyRecord) {
+            // 一条都还没有 —— 该做的是去添加，不是换时间段
+            FirstUseEmptyState(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
             )
         } else {
+            // 有数据但当前区间没有 —— 该做的是换时间段
             ChartEmptyState(
                 text = stringResource(R.string.chart_empty),
                 modifier = Modifier
@@ -197,10 +223,11 @@ private fun DateRangePicker(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(36.dp)
+            // heightIn：字体放大后日期范围要折两行，固定 36dp 会把第二行裁掉
+            .heightIn(min = 36.dp)
             .clip(shape)
             .background(colors.fieldFill)
-            .padding(horizontal = 4.dp),
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RangeArrow(
@@ -215,7 +242,8 @@ private fun DateRangePicker(
             style = typo.caption,
             color = colors.textPrimary,
             textAlign = TextAlign.Center,
-            maxLines = 1,
+            // 字体放大时日期范围放不下，允许折成两行，而不是被箭头挤掉尾部的日期
+            maxLines = 2,
             modifier = Modifier.weight(1f),
         )
 

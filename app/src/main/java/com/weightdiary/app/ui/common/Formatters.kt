@@ -3,7 +3,9 @@ package com.weightdiary.app.ui.common
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
@@ -74,8 +76,23 @@ fun Instant.formatXLabel(
 ): String {
     val dateTime = atZone(zone)
     return when (granularity) {
-        com.weightdiary.app.domain.chart.Granularity.RAW -> X_LABEL_TIME.format(dateTime)
+        com.weightdiary.app.domain.chart.Granularity.RAW ->
+            X_LABEL_TIME.format(dateTime.roundToMinuteKeepingDay())
+
         com.weightdiary.app.domain.chart.Granularity.DAILY -> X_LABEL_DATE.format(dateTime)
         com.weightdiary.app.domain.chart.Granularity.MONTHLY -> X_LABEL_MONTH.format(dateTime)
     }
+}
+
+/**
+ * 四舍五入到分钟。
+ *
+ * 「日」视图的 5 个标签落在 0% / 25% / 50% / 75% / 100%，也就是 05:59:59.999 这种时刻 ——
+ * 直接格式化会显示成「05:59」，看着像算错了。
+ * 但四舍五入到 24:00 会跨到第二天，那样一天的头尾都显示「00:00」，所以跨天时保持截断。
+ */
+private fun ZonedDateTime.roundToMinuteKeepingDay(): ZonedDateTime {
+    val truncated = truncatedTo(ChronoUnit.MINUTES)
+    val rounded = if (second >= 30) truncated.plusMinutes(1) else truncated
+    return if (rounded.toLocalDate() == toLocalDate()) rounded else truncated
 }

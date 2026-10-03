@@ -1,5 +1,9 @@
 package com.weightdiary.app.ui.home.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -10,14 +14,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,10 +59,28 @@ fun GoalStatusCard(
     val shape = RoundedCornerShape(dimen.radiusCard)
     val goal = state.goal
 
+    // 达成目标时一次性脉冲。不弹窗打断（决策 B9）—— 用户正在看数据，
+    // 一个弹窗要额外点一次才能消掉，反而打断了「刚达成」这个瞬间。
+    val pulse = remember { Animatable(1f) }
+    LaunchedEffect(goalReached) {
+        if (goalReached) {
+            pulse.snapTo(1f)
+            pulse.animateTo(1.025f, tween(durationMillis = 160, easing = LinearEasing))
+            pulse.animateTo(1f, tween(durationMillis = 280, easing = FastOutSlowInEasing))
+        } else {
+            pulse.snapTo(1f)
+        }
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(dimen.goalCardHeight)
+            // heightIn 而不是 height：系统字体放大到 1.5× 时内容要能撑开，不能被裁掉（设计规范 §8）
+            .heightIn(min = dimen.goalCardHeight)
+            .graphicsLayer {
+                scaleX = pulse.value
+                scaleY = pulse.value
+            }
             .clip(shape)
             .background(if (goalReached) colors.accentSoft else colors.cardFill)
             .border(0.5.dp, colors.cardBorder, shape)

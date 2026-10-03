@@ -81,6 +81,13 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
     )
 
     fun selectMetric(metric: Metric) {
+        val snapshot = uiState.value
+        // 「有体重，无身高」时 BMI 根本算不出来。这时点 BMI 卡应当去补身高，
+        // 而不是切到一个永远空着的图表（设计规范 §6）。一条记录都没有时不拦，切过去也无妨。
+        if (metric == Metric.BMI && snapshot.heightCm == null && !snapshot.isEmpty) {
+            openSheet(ActiveSheet.EDIT_PROFILE)
+            return
+        }
         selectedMetric.value = metric
     }
 

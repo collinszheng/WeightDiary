@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -52,7 +53,8 @@ fun RecordRowItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(ROW_HEIGHT)
+            // heightIn 而不是 height：字体放大后行内容要能撑开（设计规范 §8）
+            .heightIn(min = ROW_HEIGHT)
             .combinedClickable(
                 role = Role.Button,
                 onClick = onClick,

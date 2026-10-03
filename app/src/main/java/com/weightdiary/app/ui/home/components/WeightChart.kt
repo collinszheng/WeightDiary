@@ -282,8 +282,18 @@ fun WeightChart(
             }
 
             // ── 7. X 轴标签：按**可视窗口**重新四等分（滚动时实时重算）──
-            val labelTimes = (0..4).map { i ->
-                Instant.ofEpochMilli((visibleStartMs + visibleSpanMs * i / 4).toLong())
+            // 先量一遍 5 个候选标签。系统字体放大后它们会互相压住 ——
+            // 重叠成一团的日期比少显示几个日期更难读，所以放不下就减少数量。
+            val probe = (0..4).map { i ->
+                formatX(Instant.ofEpochMilli((visibleStartMs + visibleSpanMs * i / 4).toLong()))
+            }
+            val widest = probe.maxOf { textMeasurer.measure(it, axisStyle).size.width }
+            val labelCount = ((plotWidth / (widest * 1.35f)).toInt()).coerceIn(2, 5)
+
+            val labelTimes = (0 until labelCount).map { i ->
+                Instant.ofEpochMilli(
+                    (visibleStartMs + visibleSpanMs * i / (labelCount - 1)).toLong(),
+                )
             }
             labelTimes.forEachIndexed { index, time ->
                 val layout = textMeasurer.measure(formatX(time), axisStyle)

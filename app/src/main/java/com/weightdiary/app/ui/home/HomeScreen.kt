@@ -29,6 +29,7 @@ import com.weightdiary.app.ui.home.components.ChartCard
 import com.weightdiary.app.ui.home.components.CirclePlusButton
 import com.weightdiary.app.ui.home.components.GoalStatusCard
 import com.weightdiary.app.ui.home.components.HistorySection
+import com.weightdiary.app.ui.home.components.HomeSkeleton
 import com.weightdiary.app.ui.home.components.MetricsRow
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
@@ -55,6 +56,12 @@ fun HomeScreen(
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
     val dimen = WeightDiaryTheme.dimens
+
+    // 首屏还没拿到 Room 的第一帧时显示骨架屏，而不是先闪一下空状态
+    if (state.isLoading) {
+        HomeSkeleton(modifier = modifier)
+        return
+    }
 
     Column(
         modifier = modifier
@@ -110,6 +117,7 @@ fun HomeScreen(
         ChartCard(
             chart = state.chart,
             metric = state.selectedMetric,
+            hasAnyRecord = !state.isEmpty,
             onTabSelected = onChartTabSelected,
             onShiftRange = onShiftRange,
             modifier = Modifier.padding(horizontal = dimen.pageHorizontal),

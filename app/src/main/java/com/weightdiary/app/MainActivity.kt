@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -164,6 +165,12 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
         ActiveSheet.EDIT_PROFILE -> EditProfileSheet(
             initialHeightCm = state.heightCm,
             initialTargetWeightKg = state.goal.targetWeightKg,
+            // 从 BMI 卡点进来（有体重没身高）时说明原因，否则用户不知道为什么 BMI 是 `--`
+            hint = if (state.heightCm == null && !state.isEmpty) {
+                stringResource(R.string.sheet_onboarding_desc)
+            } else {
+                null
+            },
             onDismiss = viewModel::dismissSheet,
             onSave = { heightCm, targetWeightKg ->
                 viewModel.saveProfile(heightCm, targetWeightKg)

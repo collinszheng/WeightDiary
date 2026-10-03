@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -111,8 +113,10 @@ private fun MetricCard(
 
     Column(
         modifier = Modifier
-            .width(dimen.metricCardWidth)
-            .height(dimen.metricCardHeight)
+            // widthIn/heightIn 而不是 width/height：系统字体放大到 1.5× 时，
+            // 112dp 宽塞不下「体重（公斤）」，固定高度还会把变化量裁掉（设计规范 §8）
+            .widthIn(min = dimen.metricCardWidth)
+            .heightIn(min = dimen.metricCardHeight)
             .clip(shape)
             .background(if (selected) colors.cardSelectedFill else colors.cardFill)
             .border(
@@ -130,7 +134,7 @@ private fun MetricCard(
             text = label,
             style = typo.cardLabel,
             color = colors.textSecondary,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
 
