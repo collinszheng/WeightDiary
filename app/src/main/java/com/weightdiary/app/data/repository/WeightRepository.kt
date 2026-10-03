@@ -74,4 +74,7 @@ class WeightRepository(
 
     suspend fun setTargetWeight(targetWeightKg: Double?, setAtWeightKg: Double?) =
         profileStore.setTargetWeight(targetWeightKg, setAtWeightKg)
+
+    suspend fun setOnboardingCompleted(completed: Boolean) =
+        profileStore.setOnboardingCompleted(completed)
 }

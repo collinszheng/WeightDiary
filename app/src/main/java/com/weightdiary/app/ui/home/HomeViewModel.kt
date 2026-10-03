@@ -9,23 +9,35 @@ import com.weightdiary.app.domain.bmi.BmiClassifier
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.model.UserProfile
 import com.weightdiary.app.domain.model.WeightRecord
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
 
     private val selectedMetric = MutableStateFlow(Metric.WEIGHT)
+    private val activeSheet = MutableStateFlow(ActiveSheet.NONE)
+
+    /**
+     * 一次性事件用 Channel 而不是 StateFlow：Snackbar 这类事件不该在旋转屏幕后被重放。
+     */
+    private val _events = Channel<HomeEvent>(Channel.BUFFERED)
+    val events: Flow<HomeEvent> = _events.receiveAsFlow()
 
     val uiState: StateFlow<HomeUiState> = combine(
         repository.records,
         repository.profile,
         selectedMetric,
-    ) { records, profile, metric ->
-        buildState(records, profile, metric)
+        activeSheet,
+    ) { records, profile, metric, sheet ->
+        buildState(records, profile, metric, sheet)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -36,9 +48,72 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
         selectedMetric.value = metric
     }
 
-    /** 目前只有调试种子会用，M2 接入「编辑个人资料」弹窗后由 UI 调用 */
-    fun setHeight(heightCm: Double) {
-        viewModelScope.launch { repository.setHeight(heightCm) }
+    // ─────────────── 弹窗 ───────────────
+
+    fun openSheet(sheet: ActiveSheet) {
+        activeSheet.value = sheet
+    }
+
+    fun dismissSheet() {
+        activeSheet.value = ActiveSheet.NONE
+    }
+
+    // ─────────────── 录入 ───────────────
+
+    /**
+     * 写入一条记录。调用前 UI 已经用 [com.weightdiary.app.domain.validation.RecordValidator]
+     * 校验过，这里不做二次校验 —— 校验反馈应当是同步的、就地显示在输入框下方。
+     */
+    fun addRecord(
+        weightKg: Double,
+        measuredAt: Instant,
+        bodyFatPercent: Double?,
+        note: String?,
+    ) {
+        viewModelScope.launch {
+            val id = repository.add(
+                weightKg = weightKg,
+                measuredAt = measuredAt,
+                bodyFatPercent = bodyFatPercent,
+                note = note?.trim()?.takeIf { it.isNotEmpty() },
+            )
+            activeSheet.value = ActiveSheet.NONE
+            _events.send(HomeEvent.RecordSaved(id, weightKg))
+        }
+    }
+
+    /** Snackbar 上的「撤销」 */
+    fun undoAdd(id: Long) {
+        viewModelScope.launch { repository.delete(id) }
+    }
+
+    // ─────────────── 个人资料 ───────────────
+
+    fun saveProfile(heightCm: Double?, targetWeightKg: Double?) {
+        viewModelScope.launch {
+            val snapshot = uiState.value
+            val targetChanged = targetWeightKg != snapshot.goal.targetWeightKg
+
+            repository.setHeight(heightCm)
+            repository.setTargetWeight(
+                targetWeightKg = targetWeightKg,
+                setAtWeightKg = when {
+                    targetWeightKg == null -> null
+                    // 只有目标本身变了才重置进度起点；
+                    // 单纯改身高时若跟着重置，用户的历史进度会被抹掉
+                    targetChanged -> snapshot.goal.currentWeightKg
+                    else -> snapshot.goal.startWeightKg
+                },
+            )
+            repository.setOnboardingCompleted(true)
+            activeSheet.value = ActiveSheet.NONE
+            _events.send(HomeEvent.ProfileSaved)
+        }
+    }
+
+    /** 首次引导的「跳过」 */
+    fun completeOnboarding() {
+        viewModelScope.launch { repository.setOnboardingCompleted(true) }
     }
 
     companion object {
@@ -55,6 +130,7 @@ private fun buildState(
     records: List<WeightRecord>,
     profile: UserProfile,
     metric: Metric,
+    sheet: ActiveSheet,
 ): HomeUiState {
     // repository.records 已按 measuredAt 倒序（Dao 的 ORDER BY）
     val latest = records.firstOrNull()
@@ -85,9 +161,12 @@ private fun buildState(
         goal = GoalUi(
             currentWeightKg = latest?.weightKg,
             targetWeightKg = profile.targetWeightKg?.takeIf { it > 0.0 },
+            startWeightKg = profile.targetSetAtWeightKg,
             progress = goalProgress(profile, latest),
         ),
         level = bmi?.let { BmiClassifier.classify(it, profile.bmiStandard) },
+        activeSheet = sheet,
+        showOnboarding = !profile.onboardingCompleted,
     )
 }
 

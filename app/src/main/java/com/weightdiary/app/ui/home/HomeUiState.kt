@@ -4,6 +4,13 @@ import com.weightdiary.app.domain.model.BmiLevel
 import com.weightdiary.app.domain.model.Metric
 import java.time.Instant
 
+/** 当前打开的底部弹窗。放在 UiState 里而不是 Compose 局部状态，旋转屏幕后不会丢。 */
+enum class ActiveSheet {
+    NONE,
+    ADD_RECORD,
+    EDIT_PROFILE,
+}
+
 /**
  * 首页 UI 状态。
  *
@@ -31,14 +38,26 @@ data class HomeUiState(
     val goal: GoalUi = GoalUi(),
     /** 无身高时为 null，UI 显示 `--` */
     val level: BmiLevel? = null,
+
+    val activeSheet: ActiveSheet = ActiveSheet.NONE,
+    /** 首次启动的身高引导。填写或跳过之后都不再出现 */
+    val showOnboarding: Boolean = false,
 )
 
 data class GoalUi(
     /** 最新体重，作为目标卡片的"当前体重" */
     val currentWeightKg: Double? = null,
     val targetWeightKg: Double? = null,
+    /** 设置目标时的体重，进度条的起点。改身高时不能被覆盖 */
+    val startWeightKg: Double? = null,
     /** 目标进度 0f..1f。未设目标或无起点体重时为 null，此时不显示进度条 */
     val progress: Float? = null,
 ) {
     val hasTarget: Boolean get() = targetWeightKg != null
+}
+
+/** 一次性事件（Snackbar 之类），用 Channel 发，避免旋转屏幕后重放。 */
+sealed interface HomeEvent {
+    data class RecordSaved(val id: Long, val weightKg: Double) : HomeEvent
+    data object ProfileSaved : HomeEvent
 }

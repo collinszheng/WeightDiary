@@ -32,6 +32,7 @@ private object ProfileKeys {
     val REMINDER_ENABLED = booleanPreferencesKey("reminder_enabled")
     val REMINDER_HOUR = intPreferencesKey("reminder_hour")
     val REMINDER_MINUTE = intPreferencesKey("reminder_minute")
+    val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
 }
 
 /** 用户档案存取。低频变更，用 DataStore 而非 Room 表。 */
@@ -61,6 +62,11 @@ class ProfileStore(private val context: Context) {
 
     suspend fun setBmiStandard(standard: BmiStandard) {
         context.profileDataStore.edit { it[ProfileKeys.BMI_STANDARD] = standard.name }
+    }
+
+    /** 首次启动的身高引导：填写或跳过都调它，避免每次冷启动都弹 */
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        context.profileDataStore.edit { it[ProfileKeys.ONBOARDING_COMPLETED] = completed }
     }
 
     suspend fun setUnitSystem(unitSystem: UnitSystem) {
@@ -100,5 +106,6 @@ private fun Preferences.toUserProfile(): UserProfile {
             ?: UnitSystem.METRIC,
         reminderEnabled = this[ProfileKeys.REMINDER_ENABLED] ?: false,
         reminderTime = if (hour != null && minute != null) LocalTime.of(hour, minute) else null,
+        onboardingCompleted = this[ProfileKeys.ONBOARDING_COMPLETED] ?: false,
     )
 }

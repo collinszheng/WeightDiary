@@ -17,6 +17,8 @@ data class UserProfile(
     val unitSystem: UnitSystem = UnitSystem.METRIC,
     val reminderEnabled: Boolean = false,
     val reminderTime: LocalTime? = null,
+    /** 首次启动的身高引导是否已经走完（填写或跳过都算） */
+    val onboardingCompleted: Boolean = false,
 ) {
     val hasHeight: Boolean get() = heightCm != null && heightCm > 0.0
     val hasTarget: Boolean get() = targetWeightKg != null && targetWeightKg > 0.0

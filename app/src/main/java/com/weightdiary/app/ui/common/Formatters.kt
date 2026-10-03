@@ -43,3 +43,9 @@ fun Instant.toTimeLabel(zone: ZoneId = ZoneId.systemDefault()): TimeLabel {
         else -> TimeLabel.Absolute("${dateTime.monthValue}月${dateTime.dayOfMonth}日 $time")
     }
 }
+
+private val DATE_TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日  HH:mm")
+
+/** 编辑弹窗里显示的完整日期时间，如 `2026年6月30日  20:15` */
+fun Instant.formatDateTime(zone: ZoneId = ZoneId.systemDefault()): String =
+    DATE_TIME_FORMAT.format(atZone(zone))

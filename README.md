@@ -15,7 +15,7 @@
 |---|---|
 | M0 项目骨架 + 数据层 | ✅ 完成 |
 | M1 上半屏视觉 | ✅ 完成 |
-| M2 录入流程 | ⏳ 未开始 |
+| M2 录入流程 | ✅ 完成 |
 | M3 图表（自绘 Canvas） | ⏳ 未开始 |
 | M4 列表与记录管理 | ⏳ 未开始 |
 | M5 退化场景与打磨 | ⏳ 未开始 |
@@ -23,6 +23,8 @@
 > M0 的「能存能读、杀进程不丢」已在模拟器上实测通过：清空数据 → 冷启动显示 0 条 → 写入 1 条 → `am force-stop` → 重启后仍为 1 条。
 >
 > M1 已与设计稿并排比对通过，并用 `tools/verify-m1.py` 量化校验了 token 色彩、无 elevation、等宽数字。
+>
+> M2 已用真实点按走完整流程验证（`tools/verify-m2.ps1`）：首次引导 → 跳过 → 录入 → 变化量 → 撤销 → 设身高后 BMI 联动。
 
 ## 开发工具（tools/）
 
@@ -38,6 +40,9 @@ python tools/compare-design.py
 
 # 量化校验 M1 出口标准
 python tools/verify-m1.py build/screenshots/home-m1.png build/screenshots/home-m1-w1.png
+
+# M2 交互验证：真实点按走一遍录入流程，逐步截图
+pwsh -File tools/verify-m2.ps1
 ```
 
 > ⚠️ `tools/*.ps1` 含中文，必须带 UTF-8 BOM —— PowerShell 5.1 会把无 BOM 的 UTF-8 当 GBK 读，

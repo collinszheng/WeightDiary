@@ -23,6 +23,36 @@
     <!-- 操作 -->
     <string name="action_add_record">添加数据</string>
     <string name="action_edit_profile">编辑个人资料</string>
+    <string name="action_save">保存</string>
+    <string name="action_skip">跳过</string>
+    <string name="action_undo">撤销</string>
+
+    <!-- 底部弹窗 -->
+    <string name="sheet_add_title">添加数据</string>
+    <string name="sheet_edit_profile_title">编辑个人资料</string>
+    <string name="sheet_onboarding_title">先填一下身高</string>
+    <string name="sheet_onboarding_desc">BMI 需要身高才能算出来。身高只存在这台设备上，不会上传。</string>
+    <string name="privacy_local_only">所有数据仅保存在本机</string>
+
+    <!-- 字段 -->
+    <string name="field_datetime">日期时间</string>
+    <string name="field_weight">体重（公斤）</string>
+    <string name="field_body_fat">体脂率（%）</string>
+    <string name="field_note">备注</string>
+    <string name="field_height">身高（厘米）</string>
+    <string name="field_target_weight">目标体重（公斤）</string>
+    <string name="placeholder_select">点击选择</string>
+    <string name="placeholder_optional">选填</string>
+    <string name="placeholder_note">选填，如：晚饭后</string>
+
+    <!-- 校验提示 -->
+    <string name="error_weight_required">请输入体重</string>
+    <string name="error_out_of_range">请填写 %1$s – %2$s 之间的数值</string>
+    <string name="error_future_datetime">不能选择未来的日期时间</string>
+
+    <!-- Snackbar -->
+    <string name="snack_record_saved">已记录 %1$s kg</string>
+    <string name="snack_profile_saved">已保存个人资料</string>
 
     <!-- 拼装片段 -->
     <string name="unit_kg">kg</string>
