@@ -27,8 +27,10 @@ import com.weightdiary.app.ui.common.format1
 import com.weightdiary.app.ui.home.ActiveSheet
 import com.weightdiary.app.ui.home.HomeEvent
 import com.weightdiary.app.ui.home.HomeScreen
+import com.weightdiary.app.ui.home.HomeUiState
 import com.weightdiary.app.ui.home.HomeViewModel
 import com.weightdiary.app.ui.sheet.AddRecordSheet
+import com.weightdiary.app.ui.sheet.AllRecordsSheet
 import com.weightdiary.app.ui.sheet.EditProfileSheet
 import com.weightdiary.app.ui.sheet.OnboardingSheet
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
@@ -53,20 +55,14 @@ class MainActivity : ComponentActivity() {
                 )
                 val state by homeViewModel.uiState.collectAsStateWithLifecycle()
 
-                HomeWithSnackbar(
-                    state = state,
-                    viewModel = homeViewModel,
-                )
+                HomeWithSheets(state = state, viewModel = homeViewModel)
             }
         }
     }
 }
 
 @Composable
-private fun HomeWithSnackbar(
-    state: com.weightdiary.app.ui.home.HomeUiState,
-    viewModel: HomeViewModel,
-) {
+private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -89,10 +85,23 @@ private fun HomeWithSnackbar(
                     }
                 }
 
-                HomeEvent.ProfileSaved -> {
-                    snackbarHostState.showSnackbar(
-                        context.getString(R.string.snack_profile_saved),
+                HomeEvent.ProfileSaved -> snackbarHostState.showSnackbar(
+                    context.getString(R.string.snack_profile_saved),
+                )
+
+                HomeEvent.RecordUpdated -> snackbarHostState.showSnackbar(
+                    context.getString(R.string.snack_record_updated),
+                )
+
+                is HomeEvent.RecordDeleted -> {
+                    val result = snackbarHostState.showSnackbar(
+                        message = context.getString(R.string.snack_record_deleted),
+                        actionLabel = context.getString(R.string.action_undo),
+                        duration = SnackbarDuration.Long,
                     )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.undoDelete(event.record)
+                    }
                 }
             }
         }
@@ -106,22 +115,50 @@ private fun HomeWithSnackbar(
             onEditProfile = { viewModel.openSheet(ActiveSheet.EDIT_PROFILE) },
             onChartTabSelected = viewModel::selectTab,
             onShiftRange = viewModel::shiftRange,
+            onRecordClick = { viewModel.startEdit(it) },
+            onRecordLongClick = viewModel::deleteRecord,
+            onViewAllRecords = { viewModel.openSheet(ActiveSheet.ALL_RECORDS) },
         )
 
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .windowInsetsPadding(WindowInsets.navigationBars),
-        )
+        // 「全部记录」弹窗自己渲染 Snackbar（它盖在主窗口之上），此时主窗口这份要让位，
+        // 否则同一个 SnackbarHostState 会被两处同时渲染
+        if (state.activeSheet != ActiveSheet.ALL_RECORDS) {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+            )
+        }
     }
 
     when (state.activeSheet) {
         ActiveSheet.ADD_RECORD -> AddRecordSheet(
+            // 非空即进入编辑模式：预填原值、标题变「编辑数据」
+            initial = state.editing,
             onDismiss = viewModel::dismissSheet,
             onSubmit = { weightKg, measuredAt, bodyFatPercent, note ->
-                viewModel.addRecord(weightKg, measuredAt, bodyFatPercent, note)
+                val editing = state.editing
+                if (editing != null) {
+                    viewModel.updateRecord(
+                        id = editing.id,
+                        weightKg = weightKg,
+                        measuredAt = measuredAt,
+                        bodyFatPercent = bodyFatPercent,
+                        note = note,
+                    )
+                } else {
+                    viewModel.addRecord(weightKg, measuredAt, bodyFatPercent, note)
+                }
             },
+        )
+
+        ActiveSheet.ALL_RECORDS -> AllRecordsSheet(
+            rows = state.allRecords,
+            snackbarHostState = snackbarHostState,
+            onDismiss = viewModel::dismissSheet,
+            onRowClick = { viewModel.startEdit(it, fromAllRecords = true) },
+            onRowLongClick = viewModel::deleteRecord,
         )
 
         ActiveSheet.EDIT_PROFILE -> EditProfileSheet(

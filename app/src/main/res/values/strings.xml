@@ -69,6 +69,17 @@
     <string name="action_prev_range">上一个时间段</string>
     <string name="action_next_range">下一个时间段</string>
 
+    <!-- 历史记录 -->
+    <string name="history_title">历史记录</string>
+    <string name="history_count">共 %1$d 条</string>
+    <string name="action_view_more">查看更多记录</string>
+    <string name="sheet_all_records_title">全部记录</string>
+    <string name="sheet_edit_title">编辑数据</string>
+    <string name="snack_record_deleted">已删除记录</string>
+    <string name="snack_record_updated">已更新记录</string>
+    <string name="cd_record_row">%1$s，%2$s</string>
+    <string name="cd_delete_record">删除这条记录</string>
+
     <!-- 拼装片段 -->
     <string name="unit_kg">kg</string>
     <string name="unit_cm">cm</string>

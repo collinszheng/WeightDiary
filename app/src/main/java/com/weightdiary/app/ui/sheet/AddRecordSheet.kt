@@ -32,7 +32,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.validation.RecordValidator
+import com.weightdiary.app.domain.record.RecordRow
 import com.weightdiary.app.ui.common.NumberInput
+import com.weightdiary.app.ui.common.format1
 import com.weightdiary.app.ui.common.formatDateTime
 import com.weightdiary.app.ui.common.message
 import com.weightdiary.app.ui.sheet.components.BigNumberField
@@ -51,6 +53,9 @@ import java.time.ZonedDateTime
 /**
  * 「添加数据」底部弹窗。占约 3/4 屏高。
  *
+ * 传了 [initial] 就进入**编辑模式**：预填原值、标题换成「编辑数据」。
+ * 保存动作由调用方决定走新增还是更新 —— 这个弹窗只管收集与校验。
+ *
  * 校验是**就地同步**的：非法值立刻在字段下方提示、保存按钮同时禁用（决策 B10）。
  * 不把校验推到 ViewModel 再回传，是因为那样用户得先点保存才知道哪填错了。
  */
@@ -59,6 +64,7 @@ import java.time.ZonedDateTime
 fun AddRecordSheet(
     onDismiss: () -> Unit,
     onSubmit: (weightKg: Double, measuredAt: Instant, bodyFatPercent: Double?, note: String?) -> Unit,
+    initial: RecordRow? = null,
 ) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
@@ -66,10 +72,16 @@ fun AddRecordSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    var weightText by rememberSaveable { mutableStateOf("") }
-    var bodyFatText by rememberSaveable { mutableStateOf("") }
-    var note by rememberSaveable { mutableStateOf("") }
-    var measuredAtMillis by rememberSaveable { mutableStateOf(System.currentTimeMillis()) }
+    var weightText by rememberSaveable {
+        mutableStateOf(initial?.weightKg?.format1().orEmpty())
+    }
+    var bodyFatText by rememberSaveable {
+        mutableStateOf(initial?.bodyFatPercent?.format1().orEmpty())
+    }
+    var note by rememberSaveable { mutableStateOf(initial?.note.orEmpty()) }
+    var measuredAtMillis by rememberSaveable {
+        mutableStateOf(initial?.measuredAt?.toEpochMilli() ?: System.currentTimeMillis())
+    }
     var submitted by rememberSaveable { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -113,7 +125,11 @@ fun AddRecordSheet(
                 .fillMaxHeight(0.75f)
                 .padding(horizontal = dimen.pageHorizontal),
         ) {
-            SheetTitle(stringResource(R.string.sheet_add_title))
+            SheetTitle(
+                stringResource(
+                    if (initial != null) R.string.sheet_edit_title else R.string.sheet_add_title,
+                )
+            )
 
             Spacer(Modifier.height(16.dp))
 

@@ -6,6 +6,8 @@ import com.weightdiary.app.domain.chart.Granularity
 import com.weightdiary.app.domain.chart.YAxis
 import com.weightdiary.app.domain.model.BmiLevel
 import com.weightdiary.app.domain.model.Metric
+import com.weightdiary.app.domain.model.WeightRecord
+import com.weightdiary.app.domain.record.RecordRow
 import java.time.Instant
 
 /** 当前打开的底部弹窗。放在 UiState 里而不是 Compose 局部状态，旋转屏幕后不会丢。 */
@@ -13,6 +15,7 @@ enum class ActiveSheet {
     NONE,
     ADD_RECORD,
     EDIT_PROFILE,
+    ALL_RECORDS,
 }
 
 /**
@@ -48,7 +51,21 @@ data class HomeUiState(
     val showOnboarding: Boolean = false,
 
     val chart: ChartUi = ChartUi(),
-)
+
+    /** 首页历史列表。只放最近几条，全部记录在 [allRecords] */
+    val history: List<RecordRow> = emptyList(),
+    /** 「全部记录」弹窗用的全量列表。一次性算好，不引入 Paging（设计规范 §5.2） */
+    val allRecords: List<RecordRow> = emptyList(),
+    /** 正在编辑的记录。非空时 [ActiveSheet.ADD_RECORD] 进入编辑模式 */
+    val editing: RecordRow? = null,
+) {
+    /** 首页历史区默认展示条数（设计规范 §4.5：默认展示最近 2–3 条） */
+    val historyLimit: Int get() = HOME_HISTORY_LIMIT
+
+    val hasMoreRecords: Boolean get() = allRecords.size > history.size
+}
+
+const val HOME_HISTORY_LIMIT = 3
 
 /**
  * 图表区的状态。
@@ -98,4 +115,8 @@ data class GoalUi(
 sealed interface HomeEvent {
     data class RecordSaved(val id: Long, val weightKg: Double) : HomeEvent
     data object ProfileSaved : HomeEvent
+
+    /** 删除后给出足够信息以便原样撤销（含原 id） */
+    data class RecordDeleted(val record: WeightRecord) : HomeEvent
+    data object RecordUpdated : HomeEvent
 }

@@ -24,17 +24,20 @@ import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.model.Metric
+import com.weightdiary.app.domain.record.RecordRow
 import com.weightdiary.app.ui.home.components.ChartCard
 import com.weightdiary.app.ui.home.components.CirclePlusButton
 import com.weightdiary.app.ui.home.components.GoalStatusCard
+import com.weightdiary.app.ui.home.components.HistorySection
 import com.weightdiary.app.ui.home.components.MetricsRow
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
 /**
  * 首页。
  *
- * M1 只实现上半屏（导航栏 + 概览卡片行 + 目标与水平卡片）；
- * 图表卡片在 M3、历史记录列表在 M4 加入，届时整体换成 `LazyColumn`。
+ * 整体是 `Column + verticalScroll` 而不是 `LazyColumn`：历史记录区在首页只展示最近几条，
+ * 数据量恒定，用不着懒加载的复用机制；而图表 Canvas 放进 LazyColumn 反而会因为
+ * 回收重组带来无谓的重新测量。
  */
 @Composable
 fun HomeScreen(
@@ -44,6 +47,9 @@ fun HomeScreen(
     onEditProfile: () -> Unit,
     onChartTabSelected: (ChartTab) -> Unit,
     onShiftRange: (Int) -> Unit,
+    onRecordClick: (RecordRow) -> Unit,
+    onRecordLongClick: (RecordRow) -> Unit,
+    onViewAllRecords: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = WeightDiaryTheme.colors
@@ -109,7 +115,21 @@ fun HomeScreen(
             modifier = Modifier.padding(horizontal = dimen.pageHorizontal),
         )
 
-        // 历史记录列表（M4）会接在这里
+        // ─────────── 历史记录 ───────────
+        // 空状态时不显示这一块（设计规范 §6 退化场景）
+        if (state.history.isNotEmpty()) {
+            Spacer(Modifier.height(dimen.sectionGap))
+            HistorySection(
+                rows = state.history,
+                totalCount = state.recordCount,
+                hasMore = state.hasMoreRecords,
+                onRowClick = onRecordClick,
+                onRowLongClick = onRecordLongClick,
+                onViewMore = onViewAllRecords,
+                modifier = Modifier.padding(horizontal = dimen.pageHorizontal),
+            )
+        }
+
         Spacer(Modifier.height(dimen.sectionGap))
 
         // 避让底部手势条

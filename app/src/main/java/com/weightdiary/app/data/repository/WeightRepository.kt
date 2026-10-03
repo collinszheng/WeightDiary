@@ -66,8 +66,43 @@ class WeightRepository(
         dao.update(record.copy(updatedAt = Instant.now()).toEntity())
     }
 
+    /**
+     * 编辑一条已存在的记录。`createdAt` 保持不变。
+     *
+     * @return 是否真的改到了（记录可能已被别处删掉）
+     */
+    suspend fun updateFields(
+        id: Long,
+        weightKg: Double,
+        measuredAt: Instant,
+        bodyFatPercent: Double?,
+        note: String?,
+    ): Boolean {
+        val existing = dao.findById(id) ?: return false
+        dao.update(
+            existing.copy(
+                weightKg = weightKg,
+                measuredAt = measuredAt.toEpochMilli(),
+                bodyFatPercent = bodyFatPercent,
+                note = note,
+                updatedAt = Instant.now().toEpochMilli(),
+            )
+        )
+        return true
+    }
+
     suspend fun delete(id: Long) {
         dao.deleteById(id)
+    }
+
+    /**
+     * 撤销删除：**用原 id 原样写回**。
+     *
+     * 不能走 [add] —— 那会分配一个新 id，撤销后行的身份就变了，
+     * 列表的 key、编辑态、图表里选中点全都对不上。
+     */
+    suspend fun restore(record: WeightRecord) {
+        dao.insert(record.toEntity())
     }
 
     suspend fun setHeight(heightCm: Double?) = profileStore.setHeight(heightCm)

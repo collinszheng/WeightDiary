@@ -173,7 +173,7 @@ private fun MetricCard(
  * 箭头之外还有颜色，但**颜色不是唯一信息载体** —— 箭头本身也是语义（无障碍要求）。
  */
 @Composable
-private fun DeltaText(deltaKg: Double, modifier: Modifier = Modifier) {
+internal fun DeltaText(deltaKg: Double, modifier: Modifier = Modifier) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
 

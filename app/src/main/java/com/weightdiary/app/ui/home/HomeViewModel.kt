@@ -13,6 +13,8 @@ import com.weightdiary.app.domain.chart.RangeResolver
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.model.UserProfile
 import com.weightdiary.app.domain.model.WeightRecord
+import com.weightdiary.app.domain.record.RecordRow
+import com.weightdiary.app.domain.record.RecordRows
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +37,12 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
     /** 图表的基准日期。区间由「Tab + 基准日期」算出来，平移只动这个锚点。 */
     private val chartAnchor = MutableStateFlow(LocalDate.now())
 
+    /** 正在编辑的记录 id。非空时「添加数据」弹窗进入编辑模式。 */
+    private val editingId = MutableStateFlow<Long?>(null)
+
+    /** 编辑是从「全部记录」弹窗点进去的。保存/取消后要回到那个弹窗，而不是直接回首页。 */
+    private val returnToAllRecords = MutableStateFlow(false)
+
     /** 一次性事件用 Channel 而不是 StateFlow：Snackbar 这类事件不该在旋转屏幕后被重放。 */
     private val _events = Channel<HomeEvent>(Channel.BUFFERED)
     val events: Flow<HomeEvent> = _events.receiveAsFlow()
@@ -44,21 +52,28 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
         val profile: UserProfile,
     )
 
-    // 先把记录与档案合成一个流，否则 combine 的关键字重载最多只到 5 个
+    /** 纯 UI 的局部状态，打包成一个流，好让 combine 保持在 5 个以内 */
+    private data class UiLocal(
+        val sheet: ActiveSheet,
+        val editingId: Long?,
+    )
+
     private val dataSnapshot = combine(
         repository.records,
         repository.profile,
         ::DataSnapshot,
     )
 
+    private val uiLocal = combine(activeSheet, editingId, ::UiLocal)
+
     val uiState: StateFlow<HomeUiState> = combine(
         dataSnapshot,
         selectedMetric,
-        activeSheet,
         chartTab,
         chartAnchor,
-    ) { data, metric, sheet, tab, anchor ->
-        buildState(data.records, data.profile, metric, sheet, tab, anchor)
+        uiLocal,
+    ) { data, metric, tab, anchor, local ->
+        buildState(data.records, data.profile, metric, local.sheet, local.editingId, tab, anchor)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -88,11 +103,29 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
     // ─────────────── 弹窗 ───────────────
 
     fun openSheet(sheet: ActiveSheet) {
+        editingId.value = null
+        returnToAllRecords.value = false
         activeSheet.value = sheet
     }
 
-    fun dismissSheet() {
-        activeSheet.value = ActiveSheet.NONE
+    /**
+     * 点击某条记录 → 复用「添加数据」弹窗，但进入编辑模式。
+     *
+     * @param fromAllRecords 从「全部记录」弹窗点进来的。保存/取消后回到那个弹窗
+     */
+    fun startEdit(row: RecordRow, fromAllRecords: Boolean = false) {
+        editingId.value = row.id
+        returnToAllRecords.value = fromAllRecords
+        activeSheet.value = ActiveSheet.ADD_RECORD
+    }
+
+    fun dismissSheet() = closeSheet()
+
+    private fun closeSheet() {
+        editingId.value = null
+        val backToList = returnToAllRecords.value
+        returnToAllRecords.value = false
+        activeSheet.value = if (backToList) ActiveSheet.ALL_RECORDS else ActiveSheet.NONE
     }
 
     // ─────────────── 录入 ───────────────
@@ -122,6 +155,43 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
     /** Snackbar 上的「撤销」 */
     fun undoAdd(id: Long) {
         viewModelScope.launch { repository.delete(id) }
+    }
+
+    /** 保存编辑。校验由弹窗就地完成，这里直接落库。 */
+    fun updateRecord(
+        id: Long,
+        weightKg: Double,
+        measuredAt: Instant,
+        bodyFatPercent: Double?,
+        note: String?,
+    ) {
+        viewModelScope.launch {
+            repository.updateFields(
+                id = id,
+                weightKg = weightKg,
+                measuredAt = measuredAt,
+                bodyFatPercent = bodyFatPercent,
+                note = note?.trim()?.takeIf { it.isNotEmpty() },
+            )
+            closeSheet()
+            _events.send(HomeEvent.RecordUpdated)
+        }
+    }
+
+    // ─────────────── 删除与撤销 ───────────────
+
+    fun deleteRecord(row: RecordRow) {
+        viewModelScope.launch {
+            // 先把整条记录取出来，撤销时才能原样写回（含原 id）
+            val record = repository.findById(row.id) ?: return@launch
+            repository.delete(row.id)
+            _events.send(HomeEvent.RecordDeleted(record))
+        }
+    }
+
+    /** Snackbar 上的「撤销」。用原 id 写回，行的身份不变。 */
+    fun undoDelete(record: WeightRecord) {
+        viewModelScope.launch { repository.restore(record) }
     }
 
     // ─────────────── 个人资料 ───────────────
@@ -168,6 +238,7 @@ private fun buildState(
     profile: UserProfile,
     metric: Metric,
     sheet: ActiveSheet,
+    editingId: Long?,
     tab: ChartTab,
     anchor: LocalDate,
     zone: ZoneId = ZoneId.systemDefault(),
@@ -184,6 +255,10 @@ private fun buildState(
     } else {
         null
     }
+
+    // 列表行与图表都要遍历全部记录。1000 条量级下这点开销可以忽略，
+    // 换来的是列表与图表天然同步 —— 不用维护第二份状态，也就不会不同步。
+    val rows = RecordRows.build(records)
 
     return HomeUiState(
         isLoading = false,
@@ -210,6 +285,9 @@ private fun buildState(
         activeSheet = sheet,
         showOnboarding = !profile.onboardingCompleted,
         chart = buildChart(records, profile, metric, tab, anchor, earliestDate, height, zone, today),
+        history = rows.take(HOME_HISTORY_LIMIT),
+        allRecords = rows,
+        editing = editingId?.let { id -> rows.firstOrNull { it.id == id } },
     )
 }
 
