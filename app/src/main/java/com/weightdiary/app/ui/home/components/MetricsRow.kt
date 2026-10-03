@@ -5,16 +5,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,19 +24,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.model.Metric
-import com.weightdiary.app.ui.common.TimeLabel
 import com.weightdiary.app.ui.common.format1
-import com.weightdiary.app.ui.common.formatTrimmed
-import com.weightdiary.app.ui.common.toTimeLabel
 import com.weightdiary.app.ui.home.HomeUiState
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 import com.weightdiary.app.ui.theme.tabular
-import kotlin.math.abs
 
 /**
- * 概览卡片行。横向可滑动，四张卡片分别是体重 / BMI / 体脂率 / 身高。
+ * 概览卡片行：体重 / BMI / 体脂率。
  *
- * 前三张可点，点了切换图表指标；**身高卡片不可点**（决策 Q2）。
+ * 三张都**可点**，点了切换图表指标。
+ *
+ * 原先还有第四张「身高」卡，但它既不可点、数字也只能去设置里改，纯占位 —— 已移除。
+ * 身高仍然可以在「编辑个人资料」里改。
  */
 @Composable
 fun MetricsRow(
@@ -50,49 +46,33 @@ fun MetricsRow(
     val dimen = WeightDiaryTheme.dimens
     val placeholder = stringResource(R.string.value_placeholder)
 
-    LazyRow(
+    // 只剩三张卡，一屏放得下，不再需要 LazyRow 的横向滚动。
+    // 均分整行宽度而不是固定 112dp —— 固定宽度会在右侧留下 20 多 dp 的空档。
+    Row(
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = dimen.pageHorizontal),
         horizontalArrangement = Arrangement.spacedBy(dimen.metricCardGap),
     ) {
-        item {
-            MetricCard(
-                label = stringResource(R.string.metric_weight),
-                value = state.weightKg?.format1() ?: placeholder,
-                selected = state.selectedMetric == Metric.WEIGHT,
-                selectable = true,
-                deltaKg = state.deltaKg,
-                timeLabel = state.latestMeasuredAt?.toTimeLabel(),
-                onClick = { onMetricClick(Metric.WEIGHT) },
-            )
-        }
-        item {
-            MetricCard(
-                label = stringResource(R.string.metric_bmi),
-                value = state.bmi?.format1() ?: placeholder,
-                selected = state.selectedMetric == Metric.BMI,
-                selectable = true,
-                onClick = { onMetricClick(Metric.BMI) },
-            )
-        }
-        item {
-            MetricCard(
-                label = stringResource(R.string.metric_body_fat),
-                value = state.bodyFatPercent?.format1() ?: placeholder,
-                selected = state.selectedMetric == Metric.BODY_FAT,
-                selectable = true,
-                onClick = { onMetricClick(Metric.BODY_FAT) },
-            )
-        }
-        item {
-            MetricCard(
-                label = stringResource(R.string.metric_height),
-                value = state.heightCm?.formatTrimmed() ?: placeholder,
-                selected = false,
-                selectable = false,
-                onClick = {},
-            )
-        }
+        MetricCard(
+            label = stringResource(R.string.metric_weight),
+            value = state.weightKg?.format1() ?: placeholder,
+            selected = state.selectedMetric == Metric.WEIGHT,
+            onClick = { onMetricClick(Metric.WEIGHT) },
+            modifier = Modifier.weight(1f),
+        )
+        MetricCard(
+            label = stringResource(R.string.metric_bmi),
+            value = state.bmi?.format1() ?: placeholder,
+            selected = state.selectedMetric == Metric.BMI,
+            onClick = { onMetricClick(Metric.BMI) },
+            modifier = Modifier.weight(1f),
+        )
+        MetricCard(
+            label = stringResource(R.string.metric_body_fat),
+            value = state.bodyFatPercent?.format1() ?: placeholder,
+            selected = state.selectedMetric == Metric.BODY_FAT,
+            onClick = { onMetricClick(Metric.BODY_FAT) },
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -101,10 +81,8 @@ private fun MetricCard(
     label: String,
     value: String,
     selected: Boolean,
-    selectable: Boolean,
     onClick: () -> Unit,
-    deltaKg: Double? = null,
-    timeLabel: TimeLabel? = null,
+    modifier: Modifier = Modifier,
 ) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
@@ -112,9 +90,9 @@ private fun MetricCard(
     val shape = RoundedCornerShape(dimen.radiusCard)
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             // widthIn/heightIn 而不是 width/height：系统字体放大到 1.5× 时，
-            // 112dp 宽塞不下「体重（公斤）」，固定高度还会把变化量裁掉（设计规范 §8）
+            // 固定尺寸会把标签截断、把内容裁掉（设计规范 §8）
             .widthIn(min = dimen.metricCardWidth)
             .heightIn(min = dimen.metricCardHeight)
             .clip(shape)
@@ -124,11 +102,9 @@ private fun MetricCard(
                 color = if (selected) colors.textPrimary else colors.cardBorder,
                 shape = shape,
             )
-            .then(
-                if (selectable) Modifier.clickable(onClick = onClick, role = Role.Button)
-                else Modifier
-            )
+            .clickable(onClick = onClick, role = Role.Button)
             .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = label,
@@ -138,7 +114,7 @@ private fun MetricCard(
             overflow = TextOverflow.Ellipsis,
         )
 
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
 
         Text(
             text = value,
@@ -146,34 +122,13 @@ private fun MetricCard(
             color = colors.textPrimary,
             maxLines = 1,
         )
-
-        Spacer(Modifier.weight(1f))
-
-        if (deltaKg != null || timeLabel != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (deltaKg != null) {
-                    DeltaText(deltaKg = deltaKg, modifier = Modifier)
-                }
-                if (deltaKg != null && timeLabel != null) {
-                    Spacer(Modifier.width(4.dp))
-                }
-                if (timeLabel != null) {
-                    Text(
-                        text = timeLabel.asText(),
-                        style = typo.axisLabel,
-                        color = colors.textDisabled,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
     }
 }
 
 /**
- * 与上一条记录的差值。
+ * 变化量文字：`↓ 0.3` / `↑ 0.8` / `— 0.0`。
  *
+ * 首页概览卡已不再显示它（产品要求），但历史记录列表还在用，所以留在这里共用。
  * 箭头之外还有颜色，但**颜色不是唯一信息载体** —— 箭头本身也是语义（无障碍要求）。
  */
 @Composable
@@ -181,9 +136,9 @@ internal fun DeltaText(deltaKg: Double, modifier: Modifier = Modifier) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
 
-    val flat = abs(deltaKg) < 0.05
+    val flat = kotlin.math.abs(deltaKg) < 0.05
     val down = deltaKg < 0
-    val magnitude = abs(deltaKg).format1()
+    val magnitude = kotlin.math.abs(deltaKg).format1()
 
     val text = when {
         flat -> stringResource(R.string.delta_flat, magnitude)
@@ -203,11 +158,4 @@ internal fun DeltaText(deltaKg: Double, modifier: Modifier = Modifier) {
         maxLines = 1,
         modifier = modifier,
     )
-}
-
-@Composable
-internal fun TimeLabel.asText(): String = when (this) {
-    is TimeLabel.Today -> stringResource(R.string.time_today, time)
-    is TimeLabel.Yesterday -> stringResource(R.string.time_yesterday, time)
-    is TimeLabel.Absolute -> text
 }

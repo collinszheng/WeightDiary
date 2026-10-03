@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.record.RecordRow
 import com.weightdiary.app.ui.common.format1
+import com.weightdiary.app.ui.common.TimeLabel
 import com.weightdiary.app.ui.common.toTimeLabel
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 import com.weightdiary.app.ui.theme.tabular
@@ -113,4 +114,12 @@ fun RecordRowItem(
             maxLines = 1,
         )
     }
+}
+
+/** 时间标签的文案组装。放在这里是因为历史记录行是它唯一的用户。 */
+@Composable
+internal fun TimeLabel.asText(): String = when (this) {
+    is TimeLabel.Today -> stringResource(R.string.time_today, time)
+    is TimeLabel.Yesterday -> stringResource(R.string.time_yesterday, time)
+    is TimeLabel.Absolute -> text
 }

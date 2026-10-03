@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -33,6 +34,7 @@ import com.weightdiary.app.ui.sheet.AllRecordsSheet
 import com.weightdiary.app.ui.sheet.EditProfileSheet
 import com.weightdiary.app.ui.sheet.OnboardingSheet
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -64,6 +66,9 @@ class MainActivity : ComponentActivity() {
 private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    // 设置页还没做，先只给一条提示，避免出现一个点了没反应的死按钮
+    val settingsComingSoon = stringResource(R.string.snack_settings_coming_soon)
 
     // 一次性事件 → Snackbar。用 Channel 而不是 StateFlow，旋转屏幕不会重放
     LaunchedEffect(viewModel) {
@@ -125,6 +130,7 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             onShiftRange = viewModel::shiftRange,
             onRecordClick = { viewModel.startEdit(it) },
             onViewAllRecords = { viewModel.openSheet(ActiveSheet.ALL_RECORDS) },
+            onSettingsClick = { scope.launch { snackbarHostState.showSnackbar(settingsComingSoon) } },
         )
     }
 

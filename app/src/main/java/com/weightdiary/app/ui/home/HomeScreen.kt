@@ -31,6 +31,7 @@ import com.weightdiary.app.ui.home.components.GoalStatusCard
 import com.weightdiary.app.ui.home.components.HistorySection
 import com.weightdiary.app.ui.home.components.HomeSkeleton
 import com.weightdiary.app.ui.home.components.MetricsRow
+import com.weightdiary.app.ui.home.components.SettingsIconButton
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
 /**
@@ -50,6 +51,7 @@ fun HomeScreen(
     onShiftRange: (Int) -> Unit,
     onRecordClick: (RecordRow) -> Unit,
     onViewAllRecords: () -> Unit,
+    onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = WeightDiaryTheme.colors
@@ -83,23 +85,32 @@ fun HomeScreen(
                 color = colors.textPrimary,
                 modifier = Modifier.align(Alignment.Center),
             )
+            SettingsIconButton(
+                onClick = onSettingsClick,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = dimen.pageHorizontal - (dimen.minTouchTarget - 40.dp) / 2),
+            )
         }
 
         Spacer(Modifier.height(8.dp))
+
+        // ─────────── 目标与水平卡片 ───────────
+        // 放在概览卡片行**上面**：它是「当前 / 目标 + 水平」的总览，
+        // 先给结论再给三个分项指标，读起来更顺
+        GoalStatusCard(
+            state = state,
+            onEditProfile = onEditProfile,
+            goalReached = state.isGoalReached(),
+            modifier = Modifier.padding(horizontal = dimen.pageHorizontal),
+        )
+
+        Spacer(Modifier.height(dimen.cardGap))
 
         // ─────────── 概览卡片行 ───────────
         MetricsRow(
             state = state,
             onMetricClick = onMetricClick,
-        )
-
-        Spacer(Modifier.height(dimen.cardGap))
-
-        // ─────────── 目标与水平卡片 ───────────
-        GoalStatusCard(
-            state = state,
-            onEditProfile = onEditProfile,
-            goalReached = state.isGoalReached(),
             modifier = Modifier.padding(horizontal = dimen.pageHorizontal),
         )
 

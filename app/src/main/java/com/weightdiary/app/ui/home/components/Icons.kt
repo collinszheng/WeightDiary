@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -23,6 +24,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * 悬浮的「添加数据」按钮。
@@ -64,6 +68,63 @@ fun AddRecordFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
                 end = Offset(size.width / 2f, size.height),
                 strokeWidth = stroke,
                 cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+/**
+ * 顶栏右侧的「设置」按钮。
+ *
+ * 功能尚未定，点它只弹一条 Snackbar。位置正好是原先「添加数据」按钮待过的地方 ——
+ * 那个按钮已经改成右下角的悬浮按钮了。
+ */
+@Composable
+fun SettingsIconButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = WeightDiaryTheme.colors
+    val dimen = WeightDiaryTheme.dimens
+    val description = stringResource(R.string.action_settings)
+
+    Box(
+        modifier = modifier
+            // 触摸区撑到 48dp，视觉上的齿轮只有 22dp
+            .size(dimen.minTouchTarget)
+            .clip(CircleShape)
+            .clickable(onClick = onClick, role = Role.Button)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(22.dp)) {
+            val stroke = 1.6.dp.toPx()
+            val c = center
+            val outer = size.minDimension * 0.32f
+            val toothLen = size.minDimension * 0.13f
+            val inner = size.minDimension * 0.12f
+
+            // 八个齿：沿 45° 均匀辐射的短线，画得比齿圈粗一点，读起来才像齿轮
+            repeat(8) { i ->
+                val angle = i * (PI / 4).toFloat()
+                val dx = cos(angle)
+                val dy = sin(angle)
+                drawLine(
+                    color = colors.textPrimary,
+                    start = Offset(c.x + dx * outer, c.y + dy * outer),
+                    end = Offset(c.x + dx * (outer + toothLen), c.y + dy * (outer + toothLen)),
+                    strokeWidth = stroke * 1.8f,
+                    cap = StrokeCap.Round,
+                )
+            }
+            drawCircle(
+                color = colors.textPrimary,
+                radius = outer,
+                center = c,
+                style = Stroke(width = stroke),
+            )
+            drawCircle(
+                color = colors.textPrimary,
+                radius = inner,
+                center = c,
+                style = Stroke(width = stroke),
             )
         }
     }
