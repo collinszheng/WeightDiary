@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  自适应图标前景层：白色日记卡片 + 卡片上的一条下降折线。
+  自适应图标前景层：白色横向卡片 + 卡片上的一条下降折线。
 
-  构图说明：卡片占 23..85 × 25..83，整个落在中央 72×72 的安全区（18..90）内。
-  自适应图标的前景会被系统蒙版裁掉外围，安全区外的东西不保证可见。
+  尺寸是这样定的（单位是 108 画布）：
+    卡片  x 26..82 (宽 56)  y 33..75 (高 42)  圆角 13
+    最远点 = 圆角弧心到中心的距离 + 圆角半径
+           = sqrt(15² + 8²) + 13 = 17.0 + 13 = 30.0
 
-  折线颜色 #22BA74 比 App 内的主色 #3DD68C 更深一档 —— 白色卡片上要压得住，
-  直接用主色会发飘。
+  Android 的圆形蒙版内切于**中央 72×72**，也就是以中心为心、半径 36 的圆。
+  30.0 < 36，四角和四边都不会被切。
+
+  上一版卡片是 62×58、圆角 12，四角距中心 42.4 —— 远超 36，真机上四角被削掉了。
+  教训：做对照图时蒙版半径一度按整个 108 画布算（54），把裁剪问题掩盖了。
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -14,16 +19,16 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- 日记卡片 -->
+    <!-- 横向圆角卡片 -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M35,25h38a12,12 0 0 1 12,12v34a12,12 0 0 1 -12,12h-38a12,12 0 0 1 -12,-12v-34a12,12 0 0 1 12,-12z" />
+        android:pathData="M39,33h30a13,13 0 0 1 13,13v16a13,13 0 0 1 -13,13h-30a13,13 0 0 1 -13,-13v-16a13,13 0 0 1 13,-13z" />
 
-    <!-- 卡片上的下降折线 -->
+    <!-- 卡片上的下降折线。四周各留 10 个单位，让它在卡片里居中 -->
     <path
-        android:pathData="M33,50 L43,61 L53,42 L64,67 L74,58"
+        android:pathData="M36,48 L45,60 L54,43 L63,65 L72,56"
         android:strokeColor="#FF22BA74"
-        android:strokeWidth="5.4"
+        android:strokeWidth="4.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
 </vector>
