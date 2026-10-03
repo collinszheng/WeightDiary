@@ -26,7 +26,7 @@ import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.record.RecordRow
 import com.weightdiary.app.ui.home.components.ChartCard
-import com.weightdiary.app.ui.home.components.CirclePlusButton
+
 import com.weightdiary.app.ui.home.components.GoalStatusCard
 import com.weightdiary.app.ui.home.components.HistorySection
 import com.weightdiary.app.ui.home.components.HomeSkeleton
@@ -44,7 +44,7 @@ import com.weightdiary.app.ui.theme.WeightDiaryTheme
 fun HomeScreen(
     state: HomeUiState,
     onMetricClick: (Metric) -> Unit,
-    onAddRecord: () -> Unit,
+
     onEditProfile: () -> Unit,
     onChartTabSelected: (ChartTab) -> Unit,
     onShiftRange: (Int) -> Unit,
@@ -69,7 +69,8 @@ fun HomeScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         // ─────────── 顶部导航栏 ───────────
-        // 背景已由外层 Column 铺满（含状态栏区域），这里只把**内容**下移避开状态栏
+        // 背景已由外层 Column 铺满（含状态栏区域），这里只把**内容**下移避开状态栏。
+        // 「添加」按钮已移到右下角的悬浮按钮（由 MainActivity 的 Scaffold 承载）
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -81,14 +82,6 @@ fun HomeScreen(
                 style = typo.screenTitle,
                 color = colors.textPrimary,
                 modifier = Modifier.align(Alignment.Center),
-            )
-            CirclePlusButton(
-                onClick = onAddRecord,
-                // 让 28dp 的视觉圆圈落在距右边缘 16dp 处：
-                // 触摸区是 48dp，多出来的 (48-28)/2 = 10dp 要从 padding 里扣掉
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = dimen.pageHorizontal - (dimen.minTouchTarget - 28.dp) / 2),
             )
         }
 
@@ -136,7 +129,8 @@ fun HomeScreen(
             )
         }
 
-        Spacer(Modifier.height(dimen.sectionGap))
+        // 给右下角的悬浮按钮留出净空：不然它会把最后一块内容永久盖住
+        Spacer(Modifier.height(dimen.fabSize + dimen.fabMargin * 2))
 
         // 避让底部手势条
         Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))

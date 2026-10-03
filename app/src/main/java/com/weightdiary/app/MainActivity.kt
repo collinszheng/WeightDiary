@@ -4,11 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -17,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -30,6 +27,7 @@ import com.weightdiary.app.ui.home.HomeEvent
 import com.weightdiary.app.ui.home.HomeScreen
 import com.weightdiary.app.ui.home.HomeUiState
 import com.weightdiary.app.ui.home.HomeViewModel
+import com.weightdiary.app.ui.home.components.AddRecordFab
 import com.weightdiary.app.ui.sheet.AddRecordSheet
 import com.weightdiary.app.ui.sheet.AllRecordsSheet
 import com.weightdiary.app.ui.sheet.EditProfileSheet
@@ -97,28 +95,37 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // 用 Scaffold 承载悬浮按钮与 Snackbar：它会自动把按钮抬到 Snackbar 之上，
+    // 手写 Box 的话两者会在底部叠在一起
+    Scaffold(
+        // 系统栏避让由 HomeScreen 自己处理（它要按 statusBars / navigationBars 分别留白）
+        contentWindowInsets = WindowInsets(0),
+        containerColor = WeightDiaryTheme.colors.background,
+        snackbarHost = {
+            // 「全部记录」弹窗自己渲染 Snackbar（它盖在主窗口之上），此时主窗口这份要让位，
+            // 否则同一个 SnackbarHostState 会被两处同时渲染
+            if (state.activeSheet != ActiveSheet.ALL_RECORDS) {
+                SnackbarHost(snackbarHostState)
+            }
+        },
+        floatingActionButton = {
+            AddRecordFab(
+                onClick = { viewModel.openSheet(ActiveSheet.ADD_RECORD) },
+                // contentWindowInsets 置零之后 Scaffold 不会自己避让导航栏，
+                // 不补这一下按钮会贴着底部手势条
+                modifier = Modifier.navigationBarsPadding(),
+            )
+        },
+    ) {
         HomeScreen(
             state = state,
             onMetricClick = viewModel::selectMetric,
-            onAddRecord = { viewModel.openSheet(ActiveSheet.ADD_RECORD) },
             onEditProfile = { viewModel.openSheet(ActiveSheet.EDIT_PROFILE) },
             onChartTabSelected = viewModel::selectTab,
             onShiftRange = viewModel::shiftRange,
             onRecordClick = { viewModel.startEdit(it) },
             onViewAllRecords = { viewModel.openSheet(ActiveSheet.ALL_RECORDS) },
         )
-
-        // 「全部记录」弹窗自己渲染 Snackbar（它盖在主窗口之上），此时主窗口这份要让位，
-        // 否则同一个 SnackbarHostState 会被两处同时渲染
-        if (state.activeSheet != ActiveSheet.ALL_RECORDS) {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(WindowInsets.navigationBars),
-            )
-        }
     }
 
     when (state.activeSheet) {

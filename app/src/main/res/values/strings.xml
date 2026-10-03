@@ -84,7 +84,7 @@
 
     <!-- 空状态与无障碍 -->
     <string name="empty_no_records_title">还没有任何记录</string>
-    <string name="empty_no_records_hint">点右上角的 + 添加第一条体重</string>
+    <string name="empty_no_records_hint">点右下角的 + 添加第一条体重</string>
     <string name="loading">正在加载</string>
     <string name="cd_chart">%1$s折线图，共 %2$d 个数据点</string>
     <string name="cd_chart_empty">%1$s折线图，暂无数据</string>

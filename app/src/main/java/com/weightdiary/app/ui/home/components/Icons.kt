@@ -11,7 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
@@ -23,48 +25,46 @@ import com.weightdiary.app.R
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
 /**
- * 顶部导航栏右侧的「+」按钮。
+ * 悬浮的「添加数据」按钮。
  *
- * 视觉直径 28dp 的描边圆圈，但触摸区撑到 [WeightDiaryTheme.dimens.minTouchTarget]（48dp）——
- * 视觉可以小，手指够不着才是问题。
+ * 早先它是顶栏右侧一个描边圆圈，但点下去弹窗从**下方**升起 ——
+ * 按钮在上、结果在下，操作与反馈在空间上不呼应。改成悬浮按钮后就顺了。
+ *
+ * 这里带一点阴影：不加的话它读起来不像「浮」在内容之上，而像一个贴在角落的圆。
+ * 全 App 只有它用阴影 —— 卡片仍然一律描边不用 elevation。
  */
 @Composable
-fun CirclePlusButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun AddRecordFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = WeightDiaryTheme.colors
     val dimen = WeightDiaryTheme.dimens
     val description = stringResource(R.string.action_add_record)
 
     Box(
         modifier = modifier
-            .size(dimen.minTouchTarget)
+            .size(dimen.fabSize)
+            .shadow(elevation = 6.dp, shape = CircleShape, clip = false)
             .clip(CircleShape)
+            .background(colors.accent)
             .clickable(onClick = onClick, role = Role.Button)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .border(1.5.dp, colors.textPrimary, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.size(14.dp)) {
-                val stroke = 1.5.dp.toPx()
-                drawLine(
-                    color = colors.textPrimary,
-                    start = Offset(0f, size.height / 2f),
-                    end = Offset(size.width, size.height / 2f),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round,
-                )
-                drawLine(
-                    color = colors.textPrimary,
-                    start = Offset(size.width / 2f, 0f),
-                    end = Offset(size.width / 2f, size.height),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round,
-                )
-            }
+        Canvas(Modifier.size(20.dp)) {
+            val stroke = 2.dp.toPx()
+            drawLine(
+                color = Color.White,
+                start = Offset(0f, size.height / 2f),
+                end = Offset(size.width, size.height / 2f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = Color.White,
+                start = Offset(size.width / 2f, 0f),
+                end = Offset(size.width / 2f, size.height),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
         }
     }
 }

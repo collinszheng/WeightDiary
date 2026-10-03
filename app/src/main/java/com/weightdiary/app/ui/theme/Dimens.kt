@@ -31,6 +31,10 @@ data class WeightDiaryDimens(
     /** 无障碍最小触摸目标 */
     val minTouchTarget: Dp = 48.dp,
 
+    // ── 悬浮的「添加」按钮 ──
+    val fabSize: Dp = 56.dp,
+    val fabMargin: Dp = 16.dp,
+
     // ── 圆角 ──
     val radiusCard: Dp = 20.dp,
     val radiusButton: Dp = 12.dp,
