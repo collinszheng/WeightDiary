@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  主题图标（Android 13+）的单色层。
+
+  不能直接复用彩色前景 —— 系统按 alpha 取形后整体着色，
+  彩色前景里「白色实心卡片 + 画在卡片上的折线」会糊成一整块实心，折线反而看不见。
+  所以这里改成两条描边：卡片轮廓 + 折线，取形之后轮廓和线都还在。
+
+  颜色无所谓（系统只取 alpha），统一写白便于阅读。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:pathData="M35,25h38a12,12 0 0 1 12,12v34a12,12 0 0 1 -12,12h-38a12,12 0 0 1 -12,-12v-34a12,12 0 0 1 12,-12z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineJoin="round" />
+
+    <path
+        android:pathData="M33,50 L43,61 L53,42 L64,67 L74,58"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
