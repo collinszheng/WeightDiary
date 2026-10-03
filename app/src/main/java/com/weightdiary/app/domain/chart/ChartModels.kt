@@ -26,6 +26,28 @@ enum class Granularity {
     MONTHLY,
 }
 
+/**
+ * X 轴标签的语义类别。文案（「一」「10」「3月」…）由 UI 层按这个类别组装。
+ */
+enum class XLabelKind {
+    /** 时刻，如 `06:00`（日视图） */
+    HOUR,
+    /** 星期几，如 `一`（周视图） */
+    WEEKDAY,
+    /** 几号，如 `10`（月视图） */
+    DAY_OF_MONTH,
+    /** 几月，如 `3月`（年视图） */
+    MONTH_OF_YEAR,
+    /** 完整日期，如 `9/9`（总视图） */
+    DATE,
+}
+
+/** X 轴标签：位置 + 语义类别 */
+data class XAxisLabels(
+    val instants: List<Instant>,
+    val kind: XLabelKind,
+)
+
 /** 图表可视区间。`start` 与 `end` 都是**闭区间**（`end` 为当天 23:59:59.999）。 */
 data class ChartRange(
     val start: Instant,

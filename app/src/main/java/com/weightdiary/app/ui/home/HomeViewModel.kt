@@ -335,11 +335,11 @@ private fun buildChart(
         end = range.end,
         points = points,
         yAxis = if (points.isEmpty()) null else ChartScaffolder.buildYAxis(values, goalLine),
-        xLabels = ChartScaffolder.xLabelPositions(range),
+        xLabels = ChartScaffolder.xLabels(tab, range, zone),
         goalLine = goalLine,
         goalOffscreen = goalOffscreen,
         canShiftForward = RangeResolver.canShiftForward(tab, anchor, today, earliestDate, zone),
-        canShiftBackward = RangeResolver.canShiftBackward(earliestDate, anchor),
+        canShiftBackward = RangeResolver.canShiftBackward(tab, anchor, earliestDate, zone),
     )
 }
 

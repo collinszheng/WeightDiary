@@ -3,6 +3,8 @@ package com.weightdiary.app.ui.home
 import com.weightdiary.app.domain.chart.ChartPoint
 import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.chart.Granularity
+import com.weightdiary.app.domain.chart.XAxisLabels
+import com.weightdiary.app.domain.chart.XLabelKind
 import com.weightdiary.app.domain.chart.YAxis
 import com.weightdiary.app.domain.model.BmiLevel
 import com.weightdiary.app.domain.model.Metric
@@ -79,8 +81,8 @@ data class ChartUi(
     val end: Instant? = null,
     val points: List<ChartPoint> = emptyList(),
     val yAxis: YAxis? = null,
-    /** X 轴 5 个标签的时间点，按位置四等分 */
-    val xLabels: List<Instant> = emptyList(),
+    /** X 轴标签。位置与语义类别都由按 Tab 分类的规则给出，不是统一的「5 个等分」 */
+    val xLabels: XAxisLabels = XAxisLabels(emptyList(), XLabelKind.DATE),
     /** 画虚线的目标值。已确认纳入 Y 轴范围才会非空 */
     val goalLine: Double? = null,
     /** 目标被判定为「离数据太远、不撑开 Y 轴」时，在图表边缘画方向箭头（决策 B8） */

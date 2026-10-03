@@ -59,28 +59,43 @@ fun Instant.formatShortDateTime(zone: ZoneId = ZoneId.systemDefault()): String =
 
 private val RANGE_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日")
 private val X_LABEL_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val X_LABEL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M月d日")
-private val X_LABEL_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月")
+private val X_LABEL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M/d")
+
+/** 周一到周日 */
+private const val WEEKDAY_CHARS = "一二三四五六日"
 
 /** 日期范围选择器里的起止日期，如 `2026年06月01日` */
 fun Instant.formatRangeDate(zone: ZoneId = ZoneId.systemDefault()): String =
     RANGE_DATE_FORMAT.format(atZone(zone))
 
 /**
- * 图表 X 轴标签。格式随粒度变：
- * 按条（日视图）显示时刻、按天显示月日、按月显示年月。
+ * 图表 X 轴标签。格式随标签的**语义类别**变，而不是随粒度变 ——
+ * 周视图下所有标签都是星期几，年视图下都是月份。
+ *
+ * 日期一律用 `M/d` 而不是 `M月d日`：后者在「总」视图那种要放 5 个标签的场合太占地方。
  */
 fun Instant.formatXLabel(
-    granularity: com.weightdiary.app.domain.chart.Granularity,
+    kind: com.weightdiary.app.domain.chart.XLabelKind,
     zone: ZoneId = ZoneId.systemDefault(),
 ): String {
     val dateTime = atZone(zone)
-    return when (granularity) {
-        com.weightdiary.app.domain.chart.Granularity.RAW ->
+    return when (kind) {
+        com.weightdiary.app.domain.chart.XLabelKind.HOUR ->
             X_LABEL_TIME.format(dateTime.roundToMinuteKeepingDay())
 
-        com.weightdiary.app.domain.chart.Granularity.DAILY -> X_LABEL_DATE.format(dateTime)
-        com.weightdiary.app.domain.chart.Granularity.MONTHLY -> X_LABEL_MONTH.format(dateTime)
+        com.weightdiary.app.domain.chart.XLabelKind.WEEKDAY ->
+            WEEKDAY_CHARS[dateTime.dayOfWeek.value - 1].toString()
+
+        com.weightdiary.app.domain.chart.XLabelKind.DAY_OF_MONTH ->
+            dateTime.dayOfMonth.toString()
+
+        com.weightdiary.app.domain.chart.XLabelKind.MONTH_OF_YEAR ->
+            // 裸数字而不是「3月」：带上「月」字后 12 个标签需要 822px，
+            // 而绘图区正好 822px —— 会被抽稀成 6 个，而年视图要的就是十二个月
+            dateTime.monthValue.toString()
+
+        com.weightdiary.app.domain.chart.XLabelKind.DATE ->
+            X_LABEL_DATE.format(dateTime)
     }
 }
 

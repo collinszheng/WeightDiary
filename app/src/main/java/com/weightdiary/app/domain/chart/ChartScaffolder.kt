@@ -1,6 +1,7 @@
 package com.weightdiary.app.domain.chart
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -152,46 +153,63 @@ object ChartScaffolder {
         }.distinct().sorted()
 
     /**
-     * 5 个日期标签的时间点，**按位置四等分**。
+     * X 轴标签。**按视图分类**，不用统一的「5 个等分」——
+     * 一周就是七个星期几、一年就是十二个月，这是日历直觉，一刀切地均分反而对不上。
      *
-     * 不能按数据点序号等分，也不能吸附到最近的数据点 —— 数据有缺口时那两种做法会让间距忽宽忽窄。
-     * 见 [docs/03-技术设计.md §4.5]。
+     * 位置取所属日历单位的**中点**（中午 / 当月 15 日）：标签落在它代表的那一天
+     * 或那一月的中间，而不是起点，否则最后一个标签会离右边缘差一整格。
      */
-    fun xLabelPositions(range: ChartRange, count: Int = 5): List<Instant> {
-        if (count <= 1) return listOf(range.start)
-        val span = (range.end.toEpochMilli() - range.start.toEpochMilli()).toDouble()
-        return (0 until count).map { i ->
-            Instant.ofEpochMilli(range.start.toEpochMilli() + (span * i / (count - 1)).toLong())
+    fun xLabels(tab: ChartTab, range: ChartRange, zone: ZoneId): XAxisLabels {
+        val startDate = range.start.atZone(zone).toLocalDate()
+        val endDate = range.end.atZone(zone).toLocalDate()
+
+        return when (tab) {
+            // 0 / 6 / 12 / 18 时，最后一个是区间末端（UI 会把它显示成 24:00）
+            ChartTab.DAY -> XAxisLabels(
+                instants = listOf(0, 6, 12, 18).map { hour ->
+                    startDate.atStartOfDay(zone).plusHours(hour.toLong()).toInstant()
+                } + range.end,
+                kind = XLabelKind.HOUR,
+            )
+
+            // 周一至周日，7 个
+            ChartTab.WEEK -> XAxisLabels(
+                instants = (0..6).map { offset -> midday(startDate.plusDays(offset.toLong()), zone) },
+                kind = XLabelKind.WEEKDAY,
+            )
+
+            // 1 / 10 / 20 / 月末
+            ChartTab.MONTH -> XAxisLabels(
+                instants = listOf(1, 10, 20, endDate.dayOfMonth)
+                    .distinct()
+                    .map { day -> midday(startDate.withDayOfMonth(day), zone) },
+                kind = XLabelKind.DAY_OF_MONTH,
+            )
+
+            // 1 月至 12 月，12 个
+            ChartTab.YEAR -> XAxisLabels(
+                instants = (1..12).map { month ->
+                    midday(startDate.withMonth(month).withDayOfMonth(15), zone)
+                },
+                kind = XLabelKind.MONTH_OF_YEAR,
+            )
+
+            // 区间长度不固定，只能等分
+            ChartTab.ALL -> {
+                val span = (range.end.toEpochMilli() - range.start.toEpochMilli()).toDouble()
+                XAxisLabels(
+                    instants = (0..4).map { i ->
+                        Instant.ofEpochMilli((range.start.toEpochMilli() + span * i / 4).toLong())
+                    },
+                    kind = XLabelKind.DATE,
+                )
+            }
         }
     }
 
-    /**
-     * X 轴刻度位。**按日历单位铺满**（缺失日期也保留刻度位），
-     * 虽然不渲染，但标签定位依赖它。
-     */
-    fun xTickPositions(range: ChartRange, tab: ChartTab, zone: ZoneId): List<Instant> = when (tab) {
-        ChartTab.DAY -> (0..23).map { hour ->
-            range.start.atZone(zone).withHour(hour).withMinute(0).withSecond(0).withNano(0).toInstant()
-        }
-
-        ChartTab.WEEK, ChartTab.MONTH -> {
-            val startDate = range.start.atZone(zone).toLocalDate()
-            val endDate = range.end.atZone(zone).toLocalDate()
-            generateSequence(startDate) { it.plusDays(1) }
-                .takeWhile { !it.isAfter(endDate) }
-                .map { it.atStartOfDay(zone).toInstant() }
-                .toList()
-        }
-
-        ChartTab.YEAR, ChartTab.ALL -> {
-            val startMonth = range.start.atZone(zone).toLocalDate().withDayOfMonth(1)
-            val endMonth = range.end.atZone(zone).toLocalDate().withDayOfMonth(1)
-            generateSequence(startMonth) { it.plusMonths(1) }
-                .takeWhile { !it.isAfter(endMonth) }
-                .map { it.atStartOfDay(zone).toInstant() }
-                .toList()
-        }
-    }
+    /** 某一天的中午，用作该天的标签位置 */
+    private fun midday(date: LocalDate, zone: ZoneId): Instant =
+        date.atTime(12, 0).atZone(zone).toInstant()
 
     /** 次步长是否「干净」：最多一位小数，且不为 0 */
     private fun isClean(step: Double): Boolean {

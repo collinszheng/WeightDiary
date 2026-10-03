@@ -69,6 +69,7 @@
     <string name="range_separator">%1$s - %2$s</string>
     <string name="action_prev_range">上一个时间段</string>
     <string name="action_next_range">下一个时间段</string>
+    <string name="axis_end_of_day">24:00</string>
 
     <!-- 历史记录 -->
     <string name="history_title">历史记录</string>

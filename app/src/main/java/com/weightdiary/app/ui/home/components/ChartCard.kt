@@ -120,7 +120,8 @@ fun ChartCard(
                     yAxisTitle = axisTitle,
                     // 主步长只从整数里选，所以四个刻度必然都是整数（设计规范 §4.4）
                     formatY = { value -> value.roundToInt().toString() },
-                    formatX = { it.formatXLabel(shown.granularity) },
+                    formatX = { time, kind -> time.formatXLabel(kind) },
+                    endOfDayLabel = stringResource(R.string.axis_end_of_day),
                     formatTooltip = { point ->
                         val value = point.value.format1()
                         val withUnit = if (unit.isEmpty()) value else "$value $unit"

@@ -3,6 +3,7 @@ package com.weightdiary.app.domain.chart
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -330,63 +331,103 @@ class ChartScaffolderTest {
         assertEquals(1.0, axis.normalize(axis.upper + 10), 1e-9)
     }
 
-    // ─────────────── X 轴标签 ───────────────
+    // ─────────────── X 轴标签：按视图分类 ───────────────
+
+    private val anchorDate = LocalDate.of(2026, 6, 30) // 周二
+
+    private fun labelsFor(tab: ChartTab) = ChartScaffolder.xLabels(
+        tab,
+        RangeResolver.resolve(tab, anchorDate, LocalDate.of(2024, 3, 1), zone),
+        zone,
+    )
+
+    /** 周视图就是七个星期几，不是「5 个等分」 */
+    @Test
+    fun `周视图给七个标签且都是星期几`() {
+        val labels = labelsFor(ChartTab.WEEK)
+        assertEquals(7, labels.instants.size)
+        assertEquals(XLabelKind.WEEKDAY, labels.kind)
+        // 七个标签必须分别落在周一到周日，且各在所属那天的中点
+        val days = labels.instants.map { it.atZone(zone).dayOfWeek }
+        assertEquals(
+            listOf(
+                DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY,
+                DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY,
+            ),
+            days,
+        )
+        labels.instants.forEach { assertEquals(12, it.atZone(zone).hour) }
+    }
+
+    /** 年视图是 1 月至 12 月 */
+    @Test
+    fun `年视图给十二个月标签`() {
+        val labels = labelsFor(ChartTab.YEAR)
+        assertEquals(12, labels.instants.size)
+        assertEquals(XLabelKind.MONTH_OF_YEAR, labels.kind)
+        assertEquals((1..12).toList(), labels.instants.map { it.atZone(zone).monthValue })
+    }
+
+    /** 月视图是 1 / 10 / 20 / 月末 */
+    @Test
+    fun `月视图给 1 10 20 月末四个标签`() {
+        val labels = labelsFor(ChartTab.MONTH)
+        assertEquals(XLabelKind.DAY_OF_MONTH, labels.kind)
+        assertEquals(listOf(1, 10, 20, 30), labels.instants.map { it.atZone(zone).dayOfMonth })
+    }
 
     @Test
-    fun `5 个标签位置严格四等分`() {
-        val range = RangeResolver.resolve(
-            ChartTab.MONTH, LocalDate.of(2026, 6, 30), null, zone,
+    fun `月视图在 31 天的月份用 31 作为月末`() {
+        val labels = ChartScaffolder.xLabels(
+            ChartTab.MONTH,
+            RangeResolver.resolve(ChartTab.MONTH, LocalDate.of(2026, 7, 15), null, zone),
+            zone,
         )
-        val positions = ChartScaffolder.xLabelPositions(range)
-        assertEquals(5, positions.size)
-        assertEquals(range.start, positions.first())
-        assertEquals(range.end, positions.last())
+        assertEquals(listOf(1, 10, 20, 31), labels.instants.map { it.atZone(zone).dayOfMonth })
+    }
+
+    /** 日视图是 0 / 6 / 12 / 18 时，加上区间末端 */
+    @Test
+    fun `日视图给五个时刻标签`() {
+        val labels = labelsFor(ChartTab.DAY)
+        assertEquals(5, labels.instants.size)
+        assertEquals(XLabelKind.HOUR, labels.kind)
+        assertEquals(listOf(0, 6, 12, 18), labels.instants.dropLast(1).map { it.atZone(zone).hour })
+        // 最后一个就是区间末端（23:59:59.999），UI 会把它显示成 24:00
+        val range = RangeResolver.resolve(ChartTab.DAY, anchorDate, null, zone)
+        assertEquals(range.end, labels.instants.last())
+    }
+
+    /** 「总」跨度不固定，只能等分 */
+    @Test
+    fun `总视图给五个等分日期`() {
+        val labels = labelsFor(ChartTab.ALL)
+        assertEquals(5, labels.instants.size)
+        assertEquals(XLabelKind.DATE, labels.kind)
+
+        val range = RangeResolver.resolve(ChartTab.ALL, anchorDate, LocalDate.of(2024, 3, 1), zone)
+        assertEquals(range.start, labels.instants.first())
+        assertEquals(range.end, labels.instants.last())
 
         val span = (range.end.toEpochMilli() - range.start.toEpochMilli()).toDouble()
-        positions.forEachIndexed { i, p ->
-            val expected = range.start.toEpochMilli() + (span * i / 4).toLong()
-            assertEquals("第 $i 个标签位置", expected, p.toEpochMilli())
+        labels.instants.forEachIndexed { i, p ->
+            assertEquals(
+                range.start.toEpochMilli() + (span * i / 4).toLong(),
+                p.toEpochMilli(),
+            )
         }
     }
 
     @Test
-    fun `标签间距相等 - 数据有缺口也不受影响`() {
-        val range = RangeResolver.resolve(
-            ChartTab.MONTH, LocalDate.of(2026, 6, 30), null, zone,
-        )
-        val ms = ChartScaffolder.xLabelPositions(range).map { it.toEpochMilli() }
-        val gaps = (0 until ms.size - 1).map { ms[it + 1] - ms[it] }
-        assertTrue("间距不齐：$gaps", gaps.max() - gaps.min() <= 1)
-    }
-
-    // ─────────────── X 轴刻度位 ───────────────
-
-    @Test
-    fun `周视图的刻度位按日历日铺满`() {
-        val range = RangeResolver.resolve(ChartTab.WEEK, LocalDate.of(2026, 6, 30), null, zone)
-        val ticks = ChartScaffolder.xTickPositions(range, ChartTab.WEEK, zone)
-        assertEquals(7, ticks.size)
-    }
-
-    @Test
-    fun `月视图的刻度位按日历日铺满 - 缺失日期也保留位置`() {
-        val range = RangeResolver.resolve(ChartTab.MONTH, LocalDate.of(2026, 6, 30), null, zone)
-        val ticks = ChartScaffolder.xTickPositions(range, ChartTab.MONTH, zone)
-        // 近 30 天 = 30 个日历日，与有没有记录无关
-        assertEquals(30, ticks.size)
-    }
-
-    @Test
-    fun `年视图的刻度位按月铺满`() {
-        val range = RangeResolver.resolve(ChartTab.YEAR, LocalDate.of(2026, 6, 30), null, zone)
-        val ticks = ChartScaffolder.xTickPositions(range, ChartTab.YEAR, zone)
-        assertEquals(12, ticks.size)
-    }
-
-    @Test
-    fun `日视图的刻度位按小时铺满`() {
-        val range = RangeResolver.resolve(ChartTab.DAY, LocalDate.of(2026, 6, 30), null, zone)
-        val ticks = ChartScaffolder.xTickPositions(range, ChartTab.DAY, zone)
-        assertEquals(24, ticks.size)
+    fun `所有标签都落在区间内`() {
+        ChartTab.entries.forEach { tab ->
+            val range = RangeResolver.resolve(tab, anchorDate, LocalDate.of(2024, 3, 1), zone)
+            ChartScaffolder.xLabels(tab, range, zone).instants.forEach { instant ->
+                assertTrue(
+                    "$tab 的标签 $instant 跑到区间 $range 之外了",
+                    instant >= range.start && instant <= range.end,
+                )
+            }
+        }
     }
 }

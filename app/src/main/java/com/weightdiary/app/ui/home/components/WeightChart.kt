@@ -36,6 +36,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.domain.chart.ChartPoint
 import com.weightdiary.app.domain.chart.MonotoneCubic
+import com.weightdiary.app.domain.chart.XLabelKind
 import com.weightdiary.app.ui.home.ChartUi
 import com.weightdiary.app.ui.home.GoalOffscreen
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
@@ -71,8 +72,10 @@ fun WeightChart(
     chart: ChartUi,
     yAxisTitle: String,
     formatY: (Double) -> String,
-    formatX: (Instant) -> String,
+    formatX: (Instant, XLabelKind) -> String,
     formatTooltip: (ChartPoint) -> String,
+    /** 「日」视图最后一个标签显示成 `24:00`，而不是 `23:59` */
+    endOfDayLabel: String,
     goalLabel: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -241,28 +244,36 @@ fun WeightChart(
                 drawGoalArrow(colors.accent, chart.goalOffscreen, plotLeft, plotTop, plotBottom)
             }
 
-            // ── 7. X 轴标签：按整段范围四等分 ──
-            // 先量一遍 5 个候选标签。系统字体放大后它们会互相压住 ——
-            // 重叠成一团的日期比少显示几个日期更难读，所以放不下就减少数量。
-            val probe = (0..4).map { i ->
-                formatX(Instant.ofEpochMilli((start.toEpochMilli() + rangeMs * i / 4).toLong()))
-            }
-            val widest = probe.maxOf { textMeasurer.measure(it, axisStyle).size.width }
-            val labelCount = ((plotWidth / (widest * 1.35f)).toInt()).coerceIn(2, 5)
-
-            val labelTimes = (0 until labelCount).map { i ->
-                Instant.ofEpochMilli(
-                    (start.toEpochMilli() + rangeMs * i / (labelCount - 1)).toLong(),
-                )
-            }
-            labelTimes.forEachIndexed { index, time ->
-                val layout = textMeasurer.measure(formatX(time), axisStyle)
-                val x = when (index) {
-                    0 -> plotLeft
-                    labelTimes.lastIndex -> plotRight - layout.size.width
-                    else -> xOf(time) - layout.size.width / 2f
+            // ── 7. X 轴标签 ──
+            // 位置由按 Tab 分类的规则给出：周 = 七个星期几、年 = 十二个月、月 = 1/10/20/月末。
+            // 字体放大时它们会互相压住，按需要抽稀（隔一个、隔两个…）直到放得下。
+            val labelInstants = chart.xLabels.instants
+            val labelKind = chart.xLabels.kind
+            if (labelInstants.isNotEmpty()) {
+                val widest = labelInstants.maxOf {
+                    textMeasurer.measure(formatX(it, labelKind), axisStyle).size.width
                 }
-                drawText(layout, topLeft = Offset(x, plotBottom + 5.dp.toPx()))
+                val gapPx = 6.dp.toPx()
+                var step = 1
+                while (
+                    step < labelInstants.size &&
+                    (labelInstants.size + step - 1) / step * (widest + gapPx) > plotWidth
+                ) {
+                    step++
+                }
+                labelInstants.forEachIndexed { index, time ->
+                    if (index % step != 0) return@forEachIndexed
+                    val text = if (labelKind == XLabelKind.HOUR && index == labelInstants.lastIndex) {
+                        endOfDayLabel
+                    } else {
+                        formatX(time, labelKind)
+                    }
+                    val layout = textMeasurer.measure(text, axisStyle)
+                    // 居中，但整体钳在绘图区内 —— 首尾标签因此自然贴边而不是被切掉
+                    val x = (xOf(time) - layout.size.width / 2f)
+                        .coerceIn(plotLeft, (plotRight - layout.size.width).coerceAtLeast(plotLeft))
+                    drawText(layout, topLeft = Offset(x, plotBottom + 5.dp.toPx()))
+                }
             }
 
             // ── Y 轴标题 ──
