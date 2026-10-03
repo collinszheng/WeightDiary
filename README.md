@@ -14,13 +14,34 @@
 | 阶段 | 状态 |
 |---|---|
 | M0 项目骨架 + 数据层 | ✅ 完成 |
-| M1 上半屏视觉 | 🚧 进行中 |
+| M1 上半屏视觉 | ✅ 完成 |
 | M2 录入流程 | ⏳ 未开始 |
 | M3 图表（自绘 Canvas） | ⏳ 未开始 |
 | M4 列表与记录管理 | ⏳ 未开始 |
 | M5 退化场景与打磨 | ⏳ 未开始 |
 
 > M0 的「能存能读、杀进程不丢」已在模拟器上实测通过：清空数据 → 冷启动显示 0 条 → 写入 1 条 → `am force-stop` → 重启后仍为 1 条。
+>
+> M1 已与设计稿并排比对通过，并用 `tools/verify-m1.py` 量化校验了 token 色彩、无 elevation、等宽数字。
+
+## 开发工具（tools/）
+
+```powershell
+# 构建 → 装机 → 造数 → 截图
+pwsh -File tools/screenshot.ps1 -StartEmulator -Clear -Seed
+
+# 用不同体重再截一张，用于「等宽数字」的 A/B 验证
+pwsh -File tools/screenshot.ps1 -SkipBuild -Clear -Seed -SeedWeight 18.5 -Out home-w1.png
+
+# 与设计稿并排比对
+python tools/compare-design.py
+
+# 量化校验 M1 出口标准
+python tools/verify-m1.py build/screenshots/home-m1.png build/screenshots/home-m1-w1.png
+```
+
+> ⚠️ `tools/*.ps1` 含中文，必须带 UTF-8 BOM —— PowerShell 5.1 会把无 BOM 的 UTF-8 当 GBK 读，
+> 中文字节会吞掉后面的字符导致解析报错。**用编辑器改完这些脚本记得补回 BOM。**
 
 ## 文档
 
