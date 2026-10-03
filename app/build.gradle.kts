@@ -13,6 +13,8 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val appVersionName = "1.0"
+
 android {
     namespace = "com.weightdiary.app"
     compileSdk = 36
@@ -22,7 +24,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = appVersionName
     }
 
     signingConfigs {
@@ -63,6 +65,7 @@ android {
         buildConfig = true
     }
 
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -98,4 +101,20 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+}
+/**
+ * 把正式包拷到项目根的 dist/，并起一个纯英文的名字。
+ *
+ * 构建本身的产物已经是 app-release.apk（本来就是英文），这里只是给交付物一个带版本号的名字。
+ * 中文文件名在 Windows / adb / 手机文件管理器之间转手会踩编码坑，所以产物一律用英文名。
+ */
+tasks.register<Copy>("distRelease") {
+    group = "distribution"
+    description = "把签名后的正式包拷到 dist/WeightDiary-<版本>.apk"
+    dependsOn("assembleRelease")
+    from(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
+    into(rootProject.layout.projectDirectory.dir("dist"))
+    // 用字符串重载而不是 rename { } 闭包：闭包会捕获 Gradle 脚本对象，
+    // 配置缓存无法序列化，构建会直接失败
+    rename("app-release\\.apk", "WeightDiary-$appVersionName.apk")
 }

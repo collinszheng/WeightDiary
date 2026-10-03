@@ -284,6 +284,12 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
     }
 }
 
-/** 默认的备份文件名：体重日记-2026-10-03.csv */
+/**
+ * 默认的备份文件名：WeightDiary-2026-10-03.csv
+ *
+ * 刻意用英文 —— 中文名在 Windows 与 Android 之间转手时会踩编码坑
+ * （adb 传 UTF-8、PowerShell 按 GBK 解码，文件名会变成乱码）。
+ * 文件**内容**仍然是中文表头，方便直接用 Excel 打开。
+ */
 private fun defaultBackupFileName(): String =
-    "体重日记-" + DateTimeFormatter.ISO_LOCAL_DATE.format(LocalDate.now()) + ".csv"
+    "WeightDiary-" + DateTimeFormatter.ISO_LOCAL_DATE.format(LocalDate.now()) + ".csv"
