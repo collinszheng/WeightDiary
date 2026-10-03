@@ -161,10 +161,18 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
 
         ActiveSheet.ALL_RECORDS -> AllRecordsSheet(
             rows = state.allRecords,
+            // 编辑时**不换弹窗**，只把内容换成表单 —— 关掉再弹会「收回又弹出」
+            editing = state.editing,
             snackbarHostState = snackbarHostState,
             onDismiss = viewModel::dismissSheet,
             onRowClick = { viewModel.startEdit(it, fromAllRecords = true) },
             onRowDelete = viewModel::deleteRecord,
+            onEditSave = { weightKg, measuredAt, bodyFatPercent, note ->
+                state.editing?.let {
+                    viewModel.updateRecord(it.id, weightKg, measuredAt, bodyFatPercent, note)
+                }
+            },
+            onEditCancel = viewModel::cancelEdit,
         )
 
         ActiveSheet.EDIT_PROFILE -> EditProfileSheet(

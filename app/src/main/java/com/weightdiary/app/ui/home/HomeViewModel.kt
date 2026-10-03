@@ -40,8 +40,7 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
     /** 正在编辑的记录 id。非空时「添加数据」弹窗进入编辑模式。 */
     private val editingId = MutableStateFlow<Long?>(null)
 
-    /** 编辑是从「全部记录」弹窗点进去的。保存/取消后要回到那个弹窗，而不是直接回首页。 */
-    private val returnToAllRecords = MutableStateFlow(false)
+
 
     /** 一次性事件用 Channel 而不是 StateFlow：Snackbar 这类事件不该在旋转屏幕后被重放。 */
     private val _events = Channel<HomeEvent>(Channel.BUFFERED)
@@ -111,28 +110,34 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
 
     fun openSheet(sheet: ActiveSheet) {
         editingId.value = null
-        returnToAllRecords.value = false
         activeSheet.value = sheet
     }
 
     /**
-     * 点击某条记录 → 复用「添加数据」弹窗，但进入编辑模式。
+     * 点击某条记录 → 进入编辑模式。
      *
-     * @param fromAllRecords 从「全部记录」弹窗点进来的。保存/取消后回到那个弹窗
+     * @param fromAllRecords 从「全部记录」弹窗点进来的。此时**保持 ALL_RECORDS 不变**，
+     *   只把弹窗内容切成编辑表单 —— 关掉再弹一个会让用户看到「收回 → 弹出」，很乱
      */
     fun startEdit(row: RecordRow, fromAllRecords: Boolean = false) {
         editingId.value = row.id
-        returnToAllRecords.value = fromAllRecords
-        activeSheet.value = ActiveSheet.ADD_RECORD
+        activeSheet.value = if (fromAllRecords) ActiveSheet.ALL_RECORDS else ActiveSheet.ADD_RECORD
     }
 
-    fun dismissSheet() = closeSheet()
-
-    private fun closeSheet() {
+    fun dismissSheet() {
         editingId.value = null
-        val backToList = returnToAllRecords.value
-        returnToAllRecords.value = false
-        activeSheet.value = if (backToList) ActiveSheet.ALL_RECORDS else ActiveSheet.NONE
+        activeSheet.value = ActiveSheet.NONE
+    }
+
+    /** 编辑表单里的「‹ 全部记录」：从列表点进来的退回列表，从首页点进来的直接关掉 */
+    fun cancelEdit() = finishEditing()
+
+    /** 编辑结束（保存、删除、返回都走这里）：退回列表或关掉弹窗 */
+    private fun finishEditing() {
+        editingId.value = null
+        if (activeSheet.value != ActiveSheet.ALL_RECORDS) {
+            activeSheet.value = ActiveSheet.NONE
+        }
     }
 
     // ─────────────── 录入 ───────────────
@@ -180,7 +185,7 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
                 bodyFatPercent = bodyFatPercent,
                 note = note?.trim()?.takeIf { it.isNotEmpty() },
             )
-            closeSheet()
+            finishEditing()
             _events.send(HomeEvent.RecordUpdated)
         }
     }
@@ -196,8 +201,8 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
     fun deleteRecord(row: RecordRow) {
         viewModelScope.launch {
             repository.delete(row.id)
-            // 从编辑弹窗里删的，删完要把弹窗关掉；从列表里删的则留在列表继续删
-            if (activeSheet.value == ActiveSheet.ADD_RECORD) closeSheet()
+            // 从编辑表单里删的，删完退回列表；从列表里左滑删的则什么都不用做
+            finishEditing()
         }
     }
 

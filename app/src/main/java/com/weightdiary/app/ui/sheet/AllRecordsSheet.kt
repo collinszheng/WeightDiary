@@ -19,6 +19,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,7 @@ import com.weightdiary.app.ui.home.components.RecordRowItem
 import com.weightdiary.app.ui.home.components.SwipeToDeleteRow
 import com.weightdiary.app.ui.sheet.components.SheetTitle
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
+import java.time.Instant
 
 /**
  * 「全部记录」弹窗。75% 屏高。
@@ -48,10 +50,14 @@ import com.weightdiary.app.ui.theme.WeightDiaryTheme
 @Composable
 fun AllRecordsSheet(
     rows: List<RecordRow>,
+    /** 非空时**弹窗内容换成编辑表单**，而不是关掉再弹一个 —— 后者会「收回又弹出」，很乱 */
+    editing: RecordRow?,
     snackbarHostState: SnackbarHostState,
     onDismiss: () -> Unit,
     onRowClick: (RecordRow) -> Unit,
     onRowDelete: (RecordRow) -> Unit,
+    onEditSave: (weightKg: Double, measuredAt: Instant, bodyFatPercent: Double?, note: String?) -> Unit,
+    onEditCancel: () -> Unit,
 ) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
@@ -62,12 +68,29 @@ fun AllRecordsSheet(
     // 划开第二行时第一行会自动弹回
     var revealedId by remember { mutableStateOf<Long?>(null) }
 
+    // 进编辑表单前把划开的那行收回去，免得返回列表时它还是敞开状态
+    LaunchedEffect(editing) { if (editing != null) revealedId = null }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = colors.background,
         shape = RoundedCornerShape(topStart = dimen.radiusSheetTop, topEnd = dimen.radiusSheetTop),
     ) {
+        if (editing != null) {
+            AddRecordForm(
+                initial = editing,
+                onSave = onEditSave,
+                onDelete = { onRowDelete(editing) },
+                onBack = onEditCancel,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.75f)
+                    .padding(horizontal = dimen.pageHorizontal),
+            )
+            return@ModalBottomSheet
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
