@@ -55,4 +55,4 @@ SDK 位置，该文件不在版本库里，各人自己配。
 
 ## License
 
-尚未添加。在补上之前，默认保留所有权利。
+[MIT](LICENSE) © 2026 collinszheng
