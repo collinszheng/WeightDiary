@@ -104,6 +104,8 @@ private fun HomeWithSnackbar(
             onMetricClick = viewModel::selectMetric,
             onAddRecord = { viewModel.openSheet(ActiveSheet.ADD_RECORD) },
             onEditProfile = { viewModel.openSheet(ActiveSheet.EDIT_PROFILE) },
+            onChartTabSelected = viewModel::selectTab,
+            onShiftRange = viewModel::shiftRange,
         )
 
         SnackbarHost(

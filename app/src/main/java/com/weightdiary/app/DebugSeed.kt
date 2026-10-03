@@ -43,6 +43,8 @@ object DebugSeed {
     private suspend fun seedDemoData(repository: WeightRepository, latestWeight: Double) {
         repository.setHeight(175.0)
         repository.setTargetWeight(targetWeightKg = 67.0, setAtWeightKg = 71.8)
+        // 种子模拟的是「已经配好的用户」，否则每次造数后首次引导都会挡在前面
+        repository.setOnboardingCompleted(true)
 
         val now = Instant.now()
         // repository.records 按时间倒序，所以最新的一条决定概览卡片与"当前体重"
@@ -59,5 +61,21 @@ object DebugSeed {
             bodyFatPercent = 21.6,
             note = "seed",
         )
+        // 再往前铺 30 天的趋势数据，并与前三条接得上（否则图上会出现一个假的暴跌）。
+        // 中间故意留两处缺口，用来验证「跨空缺仍是实线」。
+        val noise = listOf(0.0, -0.18, 0.12, -0.25, 0.2, 0.0, -0.1, 0.28)
+        val gapDays = setOf(9L, 10L, 22L)
+        var index = 0
+        for (day in 3L..30L) {
+            if (day !in gapDays) {
+                repository.add(
+                    weightKg = 68.0 + (day - 2) * 0.13 + noise[index % noise.size],
+                    measuredAt = now.minus(day, ChronoUnit.DAYS),
+                    bodyFatPercent = (22.0 - day * 0.04).coerceAtLeast(15.0),
+                    note = "seed",
+                )
+            }
+            index++
+        }
     }
 }

@@ -54,6 +54,21 @@
     <string name="snack_record_saved">已记录 %1$s kg</string>
     <string name="snack_profile_saved">已保存个人资料</string>
 
+    <!-- 图表 -->
+    <string name="tab_day">日</string>
+    <string name="tab_week">周</string>
+    <string name="tab_month">月</string>
+    <string name="tab_year">年</string>
+    <string name="tab_all">总</string>
+    <string name="axis_weight">体重 (公斤)</string>
+    <string name="axis_bmi">BMI</string>
+    <string name="axis_body_fat">体脂率 (%)</string>
+    <string name="goal_line">目标 %1$s</string>
+    <string name="chart_empty">这段时间还没有记录</string>
+    <string name="range_separator">%1$s - %2$s</string>
+    <string name="action_prev_range">上一个时间段</string>
+    <string name="action_next_range">下一个时间段</string>
+
     <!-- 拼装片段 -->
     <string name="unit_kg">kg</string>
     <string name="unit_cm">cm</string>

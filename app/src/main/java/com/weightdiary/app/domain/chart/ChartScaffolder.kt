@@ -75,14 +75,14 @@ object ChartScaffolder {
             max += 1.0
         }
 
-        val span = max - min
-
-        // 候选步长按升序取第一个「既够覆盖跨度、又能整除出干净次步长」的。
-        // 第二个条件不能省：跨度 0.4 时若只按覆盖挑，会选中 0.15，
-        // 而 0.15 无论怎么分段都得到两位小数（0.15/2 = 0.075），刻度数字很难看。
+        // 候选步长按升序取第一个「能真正覆盖住数据、又能整除出干净次步长」的。
+        //
+        // 判据必须是「lower + 3M >= max」而不是「3M >= span」：下界向下取整会掉到 min 以下，
+        // 吃掉 3M 的预算。用后者会让上界低于数据最大值，折线顶部被裁掉。
         val candidates = candidateSteps()
         val majorStep = candidates.firstOrNull { step ->
-            3 * step >= span - 1e-9 && SUBDIVISION_CANDIDATES.any { isClean(step / it) }
+            val lower = floor(min / step) * step
+            lower + 3 * step >= max - 1e-9 && SUBDIVISION_CANDIDATES.any { isClean(step / it) }
         } ?: candidates.last()
 
         val subdivisions = SUBDIVISION_CANDIDATES.first { isClean(majorStep / it) }
@@ -91,6 +91,30 @@ object ChartScaffolder {
         val upper = lower + 3 * majorStep
 
         return YAxis(lower = lower, upper = upper, majorStep = majorStep, subdivisions = subdivisions)
+    }
+
+    /**
+     * 目标线要不要纳入 Y 轴范围（决策 B8）。
+     *
+     * 无条件纳入的话，目标离数据很远时 Y 轴会被撑得很开、折线压成一条平线，趋势完全看不出来。
+     * 所以只在与数据区间的距离不超过 [TARGET_STRETCH_LIMIT_RATIO] 时才纳入，
+     * 否则改为在图表边缘画一个方向箭头。
+     */
+    const val TARGET_STRETCH_LIMIT_RATIO = 0.30
+
+    fun shouldIncludeTarget(dataValues: List<Double>, target: Double): Boolean {
+        val finite = dataValues.filter { it.isFinite() }
+        if (finite.isEmpty() || !target.isFinite()) return true
+        val dataMin = finite.min()
+        val dataMax = finite.max()
+        val span = dataMax - dataMin
+        if (span < 1e-9) return true
+        val gap = when {
+            target < dataMin -> dataMin - target
+            target > dataMax -> target - dataMax
+            else -> 0.0
+        }
+        return gap <= span * TARGET_STRETCH_LIMIT_RATIO
     }
 
     /**

@@ -1,5 +1,9 @@
 package com.weightdiary.app.ui.home
 
+import com.weightdiary.app.domain.chart.ChartPoint
+import com.weightdiary.app.domain.chart.ChartTab
+import com.weightdiary.app.domain.chart.Granularity
+import com.weightdiary.app.domain.chart.YAxis
 import com.weightdiary.app.domain.model.BmiLevel
 import com.weightdiary.app.domain.model.Metric
 import java.time.Instant
@@ -42,7 +46,41 @@ data class HomeUiState(
     val activeSheet: ActiveSheet = ActiveSheet.NONE,
     /** 首次启动的身高引导。填写或跳过之后都不再出现 */
     val showOnboarding: Boolean = false,
+
+    val chart: ChartUi = ChartUi(),
 )
+
+/**
+ * 图表区的状态。
+ *
+ * 时间用 `Instant` 而不是格式化好的字符串 —— 文案由 Composable 查 strings.xml 组（决策 C5）。
+ */
+data class ChartUi(
+    val tab: ChartTab = ChartTab.WEEK,
+    val granularity: Granularity = Granularity.DAILY,
+    /** 可视区间。null 表示还没算出来（首帧） */
+    val start: Instant? = null,
+    val end: Instant? = null,
+    val points: List<ChartPoint> = emptyList(),
+    val yAxis: YAxis? = null,
+    /** X 轴 5 个标签的时间点，按位置四等分 */
+    val xLabels: List<Instant> = emptyList(),
+    /** 画虚线的目标值。已确认纳入 Y 轴范围才会非空 */
+    val goalLine: Double? = null,
+    /** 目标被判定为「离数据太远、不撑开 Y 轴」时，在图表边缘画方向箭头（决策 B8） */
+    val goalOffscreen: GoalOffscreen = GoalOffscreen.NONE,
+    val canShiftForward: Boolean = false,
+    val canShiftBackward: Boolean = false,
+) {
+    val hasData: Boolean get() = points.isNotEmpty()
+}
+
+/** 目标线跑到轴外时，箭头指向哪边 */
+enum class GoalOffscreen {
+    NONE,
+    BELOW,
+    ABOVE,
+}
 
 data class GoalUi(
     /** 最新体重，作为目标卡片的"当前体重" */

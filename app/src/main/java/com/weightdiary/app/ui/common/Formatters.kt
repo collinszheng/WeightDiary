@@ -49,3 +49,28 @@ private val DATE_TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("y
 /** 编辑弹窗里显示的完整日期时间，如 `2026年6月30日  20:15` */
 fun Instant.formatDateTime(zone: ZoneId = ZoneId.systemDefault()): String =
     DATE_TIME_FORMAT.format(atZone(zone))
+
+private val RANGE_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日")
+private val X_LABEL_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val X_LABEL_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("M月d日")
+private val X_LABEL_MONTH: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月")
+
+/** 日期范围选择器里的起止日期，如 `2026年06月01日` */
+fun Instant.formatRangeDate(zone: ZoneId = ZoneId.systemDefault()): String =
+    RANGE_DATE_FORMAT.format(atZone(zone))
+
+/**
+ * 图表 X 轴标签。格式随粒度变：
+ * 按条（日视图）显示时刻、按天显示月日、按月显示年月。
+ */
+fun Instant.formatXLabel(
+    granularity: com.weightdiary.app.domain.chart.Granularity,
+    zone: ZoneId = ZoneId.systemDefault(),
+): String {
+    val dateTime = atZone(zone)
+    return when (granularity) {
+        com.weightdiary.app.domain.chart.Granularity.RAW -> X_LABEL_TIME.format(dateTime)
+        com.weightdiary.app.domain.chart.Granularity.DAILY -> X_LABEL_DATE.format(dateTime)
+        com.weightdiary.app.domain.chart.Granularity.MONTHLY -> X_LABEL_MONTH.format(dateTime)
+    }
+}

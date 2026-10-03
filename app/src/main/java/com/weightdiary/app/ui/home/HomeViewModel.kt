@@ -6,6 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.weightdiary.app.data.repository.WeightRepository
 import com.weightdiary.app.domain.bmi.BmiCalculator
 import com.weightdiary.app.domain.bmi.BmiClassifier
+import com.weightdiary.app.domain.chart.Aggregator
+import com.weightdiary.app.domain.chart.ChartScaffolder
+import com.weightdiary.app.domain.chart.ChartTab
+import com.weightdiary.app.domain.chart.RangeResolver
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.model.UserProfile
 import com.weightdiary.app.domain.model.WeightRecord
@@ -19,25 +23,42 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
 
     private val selectedMetric = MutableStateFlow(Metric.WEIGHT)
     private val activeSheet = MutableStateFlow(ActiveSheet.NONE)
+    private val chartTab = MutableStateFlow(ChartTab.WEEK)
 
-    /**
-     * 一次性事件用 Channel 而不是 StateFlow：Snackbar 这类事件不该在旋转屏幕后被重放。
-     */
+    /** 图表的基准日期。区间由「Tab + 基准日期」算出来，平移只动这个锚点。 */
+    private val chartAnchor = MutableStateFlow(LocalDate.now())
+
+    /** 一次性事件用 Channel 而不是 StateFlow：Snackbar 这类事件不该在旋转屏幕后被重放。 */
     private val _events = Channel<HomeEvent>(Channel.BUFFERED)
     val events: Flow<HomeEvent> = _events.receiveAsFlow()
 
-    val uiState: StateFlow<HomeUiState> = combine(
+    private data class DataSnapshot(
+        val records: List<WeightRecord>,
+        val profile: UserProfile,
+    )
+
+    // 先把记录与档案合成一个流，否则 combine 的关键字重载最多只到 5 个
+    private val dataSnapshot = combine(
         repository.records,
         repository.profile,
+        ::DataSnapshot,
+    )
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        dataSnapshot,
         selectedMetric,
         activeSheet,
-    ) { records, profile, metric, sheet ->
-        buildState(records, profile, metric, sheet)
+        chartTab,
+        chartAnchor,
+    ) { data, metric, sheet, tab, anchor ->
+        buildState(data.records, data.profile, metric, sheet, tab, anchor)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -46,6 +67,22 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
 
     fun selectMetric(metric: Metric) {
         selectedMetric.value = metric
+    }
+
+    // ─────────────── 图表 ───────────────
+
+    fun selectTab(tab: ChartTab) {
+        chartTab.value = tab
+        // 切 Tab 时把锚点拉回今天。否则从「年」退回「日」，会停在一个很久以前的位置，
+        // 用户看到的是空图，还得连点几十次右箭头才能回来。
+        chartAnchor.value = LocalDate.now()
+    }
+
+    fun shiftRange(steps: Int) {
+        val chart = uiState.value.chart
+        if (steps > 0 && !chart.canShiftForward) return
+        if (steps < 0 && !chart.canShiftBackward) return
+        chartAnchor.value = RangeResolver.shiftAnchor(chartTab.value, chartAnchor.value, steps)
     }
 
     // ─────────────── 弹窗 ───────────────
@@ -131,10 +168,15 @@ private fun buildState(
     profile: UserProfile,
     metric: Metric,
     sheet: ActiveSheet,
+    tab: ChartTab,
+    anchor: LocalDate,
+    zone: ZoneId = ZoneId.systemDefault(),
+    today: LocalDate = LocalDate.now(zone),
 ): HomeUiState {
-    // repository.records 已按 measuredAt 倒序（Dao 的 ORDER BY）
+    // repository.records 已按 measuredAt 倒序（Dao 的 ORDER BY），所以末条就是最早那条
     val latest = records.firstOrNull()
     val previous = records.getOrNull(1)
+    val earliestDate = records.lastOrNull()?.measuredAt?.atZone(zone)?.toLocalDate()
 
     val height = profile.heightCm?.takeIf { it > 0.0 }
     val bmi = if (latest != null && height != null) {
@@ -167,6 +209,52 @@ private fun buildState(
         level = bmi?.let { BmiClassifier.classify(it, profile.bmiStandard) },
         activeSheet = sheet,
         showOnboarding = !profile.onboardingCompleted,
+        chart = buildChart(records, profile, metric, tab, anchor, earliestDate, height, zone, today),
+    )
+}
+
+private fun buildChart(
+    records: List<WeightRecord>,
+    profile: UserProfile,
+    metric: Metric,
+    tab: ChartTab,
+    anchor: LocalDate,
+    earliestDate: LocalDate?,
+    heightCm: Double?,
+    zone: ZoneId,
+    today: LocalDate,
+): ChartUi {
+    val range = RangeResolver.resolve(tab, anchor, earliestDate, zone)
+    val granularity = RangeResolver.granularityOf(tab, range)
+    val points = Aggregator.aggregate(records, range, granularity, metric, heightCm, zone)
+    val values = points.map { it.value }
+
+    // 目标线只对体重有意义 —— BMI / 体脂率没有「目标值」这个概念
+    val rawTarget = profile.targetWeightKg
+        ?.takeIf { it > 0.0 && metric == Metric.WEIGHT }
+
+    // 决策 B8：目标离数据太远就不撑开 Y 轴，否则折线会被压成一条平线，趋势全看不出来
+    val includeTarget = rawTarget != null && ChartScaffolder.shouldIncludeTarget(values, rawTarget)
+    val goalLine = rawTarget?.takeIf { includeTarget }
+    val goalOffscreen = when {
+        rawTarget == null || includeTarget -> GoalOffscreen.NONE
+        values.isEmpty() -> GoalOffscreen.NONE
+        rawTarget < values.min() -> GoalOffscreen.BELOW
+        else -> GoalOffscreen.ABOVE
+    }
+
+    return ChartUi(
+        tab = tab,
+        granularity = granularity,
+        start = range.start,
+        end = range.end,
+        points = points,
+        yAxis = if (points.isEmpty()) null else ChartScaffolder.buildYAxis(values, goalLine),
+        xLabels = ChartScaffolder.xLabelPositions(range),
+        goalLine = goalLine,
+        goalOffscreen = goalOffscreen,
+        canShiftForward = RangeResolver.canShiftForward(tab, anchor, today, earliestDate, zone),
+        canShiftBackward = RangeResolver.canShiftBackward(earliestDate, anchor),
     )
 }
 

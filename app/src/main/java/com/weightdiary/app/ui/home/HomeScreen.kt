@@ -22,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
+import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.model.Metric
+import com.weightdiary.app.ui.home.components.ChartCard
 import com.weightdiary.app.ui.home.components.CirclePlusButton
 import com.weightdiary.app.ui.home.components.GoalStatusCard
 import com.weightdiary.app.ui.home.components.MetricsRow
@@ -40,6 +42,8 @@ fun HomeScreen(
     onMetricClick: (Metric) -> Unit,
     onAddRecord: () -> Unit,
     onEditProfile: () -> Unit,
+    onChartTabSelected: (ChartTab) -> Unit,
+    onShiftRange: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = WeightDiaryTheme.colors
@@ -94,7 +98,18 @@ fun HomeScreen(
             modifier = Modifier.padding(horizontal = dimen.pageHorizontal),
         )
 
-        // 图表卡片（M3）与历史记录列表（M4）会接在这里
+        Spacer(Modifier.height(dimen.cardGap))
+
+        // ─────────── 图表卡片 ───────────
+        ChartCard(
+            chart = state.chart,
+            metric = state.selectedMetric,
+            onTabSelected = onChartTabSelected,
+            onShiftRange = onShiftRange,
+            modifier = Modifier.padding(horizontal = dimen.pageHorizontal),
+        )
+
+        // 历史记录列表（M4）会接在这里
         Spacer(Modifier.height(dimen.sectionGap))
 
         // 避让底部手势条

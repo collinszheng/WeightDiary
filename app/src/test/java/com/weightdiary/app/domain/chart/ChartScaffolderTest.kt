@@ -10,6 +10,98 @@ class ChartScaffolderTest {
 
     private val zone = ZoneId.of("UTC")
 
+    // ─────────────── Y 轴：必须真的覆盖住数据 ───────────────
+
+    /**
+     * 这是修过的一个真 bug。
+     *
+     * 原先按「3M ≥ 跨度」挑步长，但下界向下取整会掉到 min 以下、吃掉 3M 的预算，
+     * 结果是 `lower + 3M < max` —— 折线顶部被裁到图外。
+     * 判据必须是「lower + 3M ≥ max」。
+     */
+    @Test
+    fun `上界必须不低于数据最大值 - 否则折线会被裁掉`() {
+        val cases = listOf(
+            listOf(67.0, 68.8),          // 含目标线时最容易触发
+            listOf(66.0, 72.0),
+            listOf(66.0, 70.5),
+            listOf(64.0, 76.0),
+            listOf(65.0, 80.0),
+            listOf(67.3, 71.8),
+            listOf(60.1, 60.9),
+            listOf(120.0, 121.0),
+        )
+        cases.forEach { values ->
+            val axis = ChartScaffolder.buildYAxis(values)
+            assertTrue(
+                "输入 $values：上界 ${axis.upper} 低于最大值 ${values.max()}",
+                axis.upper >= values.max() - 1e-9,
+            )
+            assertTrue(
+                "输入 $values：下界 ${axis.lower} 高于最小值 ${values.min()}",
+                axis.lower <= values.min() + 1e-9,
+            )
+        }
+    }
+
+    @Test
+    fun `随机取值下也始终覆盖数据`() {
+        var seed = 42L
+        fun nextDouble(): Double {
+            seed = (seed * 6364136223846793005L + 1442695040888963407L)
+            return ((seed ushr 11).toDouble() / (1L shl 53).toDouble())
+        }
+        repeat(300) {
+            val base = 20.0 + nextDouble() * 90.0
+            val values = List(1 + (nextDouble() * 8).toInt()) { base + nextDouble() * 12.0 - 6.0 }
+            val target = if (nextDouble() < 0.5) base - nextDouble() * 6.0 else null
+
+            val all = if (target != null) values + target else values
+            val axis = ChartScaffolder.buildYAxis(values, target)
+            assertTrue(
+                "values=$values target=$target 上界 ${axis.upper} 没盖住 ${all.max()}",
+                axis.upper >= all.max() - 1e-6,
+            )
+            assertTrue(
+                "values=$values target=$target 下界 ${axis.lower} 没盖住 ${all.min()}",
+                axis.lower <= all.min() + 1e-6,
+            )
+        }
+    }
+
+    // ─────────────── 目标线：30% 撑开限制（决策 B8）───────────────
+
+    @Test
+    fun `目标靠近数据时纳入范围`() {
+        // 数据 67.7-68.8（跨度 1.1），目标 67.0，差距 0.7 = 64% 跨度 → 超出 30%，不该纳入
+        assertTrue(ChartScaffolder.shouldIncludeTarget(listOf(67.7, 68.8), 67.6))
+        assertTrue(ChartScaffolder.shouldIncludeTarget(listOf(67.7, 68.8), 68.0))
+    }
+
+    @Test
+    fun `目标远离数据时不纳入 - 否则折线会被压成平线`() {
+        assertTrue(
+            "目标 65 与数据 67.7-68.8 差 2.7，远超 30%",
+            !ChartScaffolder.shouldIncludeTarget(listOf(67.7, 68.8), 65.0),
+        )
+        assertTrue(!ChartScaffolder.shouldIncludeTarget(listOf(67.7, 68.8), 70.5))
+    }
+
+    @Test
+    fun `目标在数据区间内时必然纳入`() {
+        assertTrue(ChartScaffolder.shouldIncludeTarget(listOf(66.0, 72.0), 68.0))
+    }
+
+    @Test
+    fun `数据跨度为零时目标无条件纳入`() {
+        assertTrue(ChartScaffolder.shouldIncludeTarget(listOf(68.0, 68.0), 60.0))
+    }
+
+    @Test
+    fun `没有数据时目标无条件纳入`() {
+        assertTrue(ChartScaffolder.shouldIncludeTarget(emptyList(), 60.0))
+    }
+
     // ─────────────── Y 轴：对齐设计文档的主/次步长对照表 ───────────────
 
     /**
