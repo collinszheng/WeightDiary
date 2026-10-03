@@ -40,7 +40,14 @@ data class YAxis(
 
 object ChartScaffolder {
 
-    private val NICE_STEPS = listOf(0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
+    /**
+     * 主步长**只从整数里选** —— 这样四条主刻度的数字必然是整数（设计规范 §2.4 / §4.4）。
+     * 最小步长是 1，所以刻度窗口至少 3 个单位宽。
+     */
+    private val NICE_INT_STEPS = listOf(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
+
+    /** 数据上下各留这么多比例的空隙，免得最低/最高点正好压在轴线上（圆点会被裁掉一半） */
+    private const val PADDING_RATIO = 0.08
 
     /** 次刻度的候选分段数，优先取能整除出「干净」次步长的那个 */
     private val SUBDIVISION_CANDIDATES = listOf(4, 3, 5, 2)
@@ -48,12 +55,8 @@ object ChartScaffolder {
     /**
      * 构造 Y 轴。
      *
-     * 步长按**原始跨度**选（不含额外 padding）—— 因为把下界向下取整到步长的整数倍，
-     * 本身就已经留出了留白，再加一层 padding 会让刻度值变得不整。
-     * 数据点万一贴到上下边界，由绘图区在内缩边距里解决（UI 层的事）。
-     *
      * @param values   参与绘图的数据值
-     * @param targetLine 目标体重，必须一并纳入范围 —— 否则目标虚线会跑到图外
+     * @param targetLine 目标体重。是否纳入由调用方先用 [shouldIncludeTarget] 判断过
      */
     fun buildYAxis(values: List<Double>, targetLine: Double? = null): YAxis {
         val extremes = buildList {
@@ -75,19 +78,25 @@ object ChartScaffolder {
             max += 1.0
         }
 
-        // 候选步长按升序取第一个「能真正覆盖住数据、又能整除出干净次步长」的。
+        // 先给数据留出边距，再据此选步长与对齐 —— 顺序不能反，
+        // 否则「68.0–69.0」会得到紧贴的 68/69/70/71 而不是留了边距的 67/68/69/70
+        val pad = (max - min) * PADDING_RATIO
+        val lo = min - pad
+        val hi = max + pad
+
+        // 候选步长按升序取第一个「能真正覆盖住留边后的数据、又能整除出干净次步长」的。
         //
-        // 判据必须是「lower + 3M >= max」而不是「3M >= span」：下界向下取整会掉到 min 以下，
+        // 判据必须是「lower + 3M >= hi」而不是「3M >= 跨度」：下界向下取整会掉到 lo 以下，
         // 吃掉 3M 的预算。用后者会让上界低于数据最大值，折线顶部被裁掉。
         val candidates = candidateSteps()
         val majorStep = candidates.firstOrNull { step ->
-            val lower = floor(min / step) * step
-            lower + 3 * step >= max - 1e-9 && SUBDIVISION_CANDIDATES.any { isClean(step / it) }
+            val lower = floor(lo / step) * step
+            lower + 3 * step >= hi - 1e-9 && SUBDIVISION_CANDIDATES.any { isClean(step / it) }
         } ?: candidates.last()
 
         val subdivisions = SUBDIVISION_CANDIDATES.first { isClean(majorStep / it) }
 
-        val lower = floor(min / majorStep) * majorStep
+        val lower = floor(lo / majorStep) * majorStep
         val upper = lower + 3 * majorStep
 
         return YAxis(lower = lower, upper = upper, majorStep = majorStep, subdivisions = subdivisions)
@@ -118,15 +127,15 @@ object ChartScaffolder {
     }
 
     /**
-     * 全部候选步长：`{0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10} × 10^k`，升序。
+     * 全部候选步长：`{1, 2, 3, 4, 5, 6, 8, 10} × 10^k`（k = 0..2），升序，全是整数。
      *
      * 不能先把量级归一到 10 的幂再乘 —— 那样跨度 12 时候选会从 5 起步，把 4 漏掉。
      */
     private fun candidateSteps(): List<Double> =
-        (-3..3).flatMap { k ->
+        (0..2).flatMap { k ->
             val scale = 10.0.pow(k)
-            NICE_STEPS.map { it * scale }
-        }.sorted()
+            NICE_INT_STEPS.map { it * scale }
+        }.distinct().sorted()
 
     /**
      * 5 个日期标签的时间点，**按位置四等分**。

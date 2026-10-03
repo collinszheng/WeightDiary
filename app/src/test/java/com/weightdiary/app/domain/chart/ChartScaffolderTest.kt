@@ -106,27 +106,83 @@ class ChartScaffolderTest {
 
     /**
      * 逐行核对 [docs/03-技术设计.md §4.4] 的对照表。
-     * 表里「数据跨度」是原始跨度，不含 padding —— 下界向下取整本身已提供留白。
+     *
+     * 算法要点：主步长只从整数里选（最小 1），下界按步长整数倍向下取整，
+     * 数据上下各留 8% 边距，范围恒为 `lower .. lower + 3M`。
      */
     @Test
     fun `设计文档对照表 - 主步长与总刻度线数`() {
-        data class Case(val min: Double, val max: Double, val step: Double, val subs: Int, val total: Int)
+        data class Case(
+            val min: Double,
+            val max: Double,
+            val step: Double,
+            val subs: Int,
+            val total: Int,
+            val ticks: List<Double>,
+        )
 
         val cases = listOf(
-            Case(68.0, 69.5, 0.5, 5, 16),
-            Case(66.0, 70.5, 1.5, 3, 10),
-            Case(66.0, 72.0, 2.0, 4, 13),
-            Case(66.0, 75.0, 3.0, 3, 10),
-            Case(64.0, 76.0, 4.0, 4, 13),
-            Case(65.0, 80.0, 5.0, 5, 16),
+            Case(68.0, 69.0, 1.0, 5, 16, listOf(67.0, 68.0, 69.0, 70.0)),
+            Case(68.0, 69.5, 1.0, 5, 16, listOf(67.0, 68.0, 69.0, 70.0)),
+            Case(66.0, 72.0, 4.0, 4, 13, listOf(64.0, 68.0, 72.0, 76.0)),
+            Case(66.0, 75.0, 4.0, 4, 13, listOf(64.0, 68.0, 72.0, 76.0)),
+            Case(64.0, 76.0, 6.0, 4, 13, listOf(60.0, 66.0, 72.0, 78.0)),
+            Case(65.0, 80.0, 10.0, 4, 13, listOf(60.0, 70.0, 80.0, 90.0)),
         )
 
         cases.forEach { c ->
             val axis = ChartScaffolder.buildYAxis(listOf(c.min, c.max))
-            assertEquals("跨度 ${c.max - c.min} 的主步长", c.step, axis.majorStep, 1e-9)
-            assertEquals("跨度 ${c.max - c.min} 的分段数", c.subs, axis.subdivisions)
-            assertEquals("跨度 ${c.max - c.min} 的总刻度线", c.total, axis.allTicks.size)
+            val label = "数据 ${c.min}–${c.max}"
+            assertEquals("$label 的主步长", c.step, axis.majorStep, 1e-9)
+            assertEquals("$label 的分段数", c.subs, axis.subdivisions)
+            assertEquals("$label 的总刻度线", c.total, axis.allTicks.size)
+            c.ticks.forEachIndexed { i, expected ->
+                assertEquals("$label 第 $i 条主刻度", expected, axis.majorTicks[i], 1e-9)
+            }
         }
+    }
+
+    /**
+     * 核心要求：**四条主刻度的数字必须是整数**。
+     *
+     * 主步长只从整数里选，所以只要下界是步长的整数倍就成立。
+     * 这是用户明确提出的要求 —— 早先为了照顾小跨度，步长会落到 0.4 这种值，
+     * 刻度就出现了 68.4 / 68.8。
+     */
+    @Test
+    fun `主刻度数字永远是整数`() {
+        var seed = 7L
+        fun nextDouble(): Double {
+            seed = (seed * 6364136223846793005L + 1442695040888963407L)
+            return ((seed ushr 11).toDouble() / (1L shl 53).toDouble())
+        }
+        repeat(400) {
+            // 覆盖体重 / BMI / 体脂率三种量级，以及各种窄跨度
+            val base = when ((nextDouble() * 3).toInt()) {
+                0 -> 20.0 + nextDouble() * 100.0   // 体重
+                1 -> 15.0 + nextDouble() * 20.0    // BMI
+                else -> 5.0 + nextDouble() * 45.0  // 体脂率
+            }
+            val width = listOf(0.05, 0.3, 0.9, 2.0, 7.0, 25.0)[(nextDouble() * 6).toInt()]
+            val values = List(2 + (nextDouble() * 6).toInt()) { base + nextDouble() * width }
+
+            val axis = ChartScaffolder.buildYAxis(values)
+            axis.majorTicks.forEach { tick ->
+                assertEquals(
+                    "values=$values 出现非整数刻度 $tick",
+                    tick,
+                    Math.round(tick).toDouble(),
+                    1e-9,
+                )
+            }
+        }
+    }
+
+    /** 用户举的例子：记录都在 68–69 之间 → 刻度 67 / 68 / 69 / 70 */
+    @Test
+    fun `用户举例 - 68 到 69 之间应得到 67 68 69 70`() {
+        val axis = ChartScaffolder.buildYAxis(listOf(68.0, 68.4, 68.8, 69.0))
+        assertEquals(listOf(67.0, 68.0, 69.0, 70.0), axis.majorTicks)
     }
 
     @Test
@@ -151,9 +207,9 @@ class ChartScaffolderTest {
     @Test
     fun `次步长最多一位小数`() {
         val cases = listOf(
-            listOf(68.0, 69.5), listOf(66.0, 70.5), listOf(66.0, 72.0),
-            listOf(66.0, 75.0), listOf(64.0, 76.0), listOf(65.0, 80.0),
-            listOf(60.0, 100.0), listOf(67.0, 67.4),
+            listOf(68.0, 69.0), listOf(66.0, 72.0), listOf(66.0, 75.0),
+            listOf(64.0, 76.0), listOf(65.0, 80.0), listOf(60.0, 100.0),
+            listOf(67.0, 67.4), listOf(20.0, 200.0),
         )
         cases.forEach { values ->
             val axis = ChartScaffolder.buildYAxis(values)

@@ -90,15 +90,11 @@ fun ChartCard(
         Spacer(Modifier.height(12.dp))
 
         if (chart.hasData) {
-            // 设计规范要求 Y 轴左侧「取整数」。但跨度很小时（比如 0.5 的步长）整数会全部重合，
-            // 所以步长 < 1 时退回一位小数。
-            val majorStep = chart.yAxis?.majorStep ?: 1.0
             WeightChart(
                 chart = chart,
                 yAxisTitle = stringResource(metric.axisTitleRes()),
-                formatY = { value ->
-                    if (majorStep >= 1.0 - 1e-9) value.roundToInt().toString() else value.format1()
-                },
+                // 主步长只从整数里选，所以四个刻度必然都是整数（设计规范 §4.4）
+                formatY = { value -> value.roundToInt().toString() },
                 formatX = { it.formatXLabel(chart.granularity) },
                 goalLabel = chart.goalLine?.let { stringResource(R.string.goal_line, it.format1()) },
                 modifier = Modifier
