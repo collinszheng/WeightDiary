@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -94,34 +95,37 @@ fun SettingsIconButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        // 三条带滑块的横线，也就是通常说的「tune」图标。
-        // 原先画的是八齿齿轮 + 内外两圈，22dp 下细节糊在一起，看着很吵。
+        // 六角螺母：六边形外框 + 中心圆。
+        // 选它是因为在 22dp 的真实尺寸下依然结实 —— 齿轮那类高细节图形缩到这么小就糊了。
         Canvas(Modifier.size(20.dp)) {
             val stroke = 1.6.dp.toPx()
-            val knob = 2.4.dp.toPx()
-            // 每条线：纵向位置 + 滑块横向位置，刻意错开，不然像三条等长的横杠
-            val rows = listOf(0.25f to 0.68f, 0.5f to 0.34f, 0.75f to 0.58f)
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val circum = size.minDimension * 0.40f
 
-            rows.forEach { (yRatio, xRatio) ->
-                val y = size.height * yRatio
-                drawLine(
-                    color = colors.textPrimary,
-                    start = Offset(0f, y),
-                    end = Offset(size.width, y),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round,
-                )
-                val cx = size.width * xRatio
-                // 滑块用底色填实再描边，线条才像是从它背后穿过
-                drawCircle(color = colors.background, radius = knob, center = Offset(cx, y))
-                drawCircle(
-                    color = colors.textPrimary,
-                    radius = knob,
-                    center = Offset(cx, y),
-                    style = Stroke(width = stroke),
-                )
+            // 尖角朝上的正六边形（外接圆半径 R 的六边形，宽 √3·R、高 2R）
+            val hex = Path().apply {
+                for (i in 0 until 6) {
+                    val angle = (-PI / 2 + i * PI / 3).toFloat()
+                    val x = cx + cos(angle) * circum
+                    val y = cy + sin(angle) * circum
+                    if (i == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                close()
             }
-        }    }
+            drawPath(
+                path = hex,
+                color = colors.textPrimary,
+                style = Stroke(width = stroke, join = StrokeJoin.Round),
+            )
+            drawCircle(
+                color = colors.textPrimary,
+                radius = size.minDimension * 0.16f,
+                center = Offset(cx, cy),
+                style = Stroke(width = stroke),
+            )
+        }
+    }
 }
 
 /**
