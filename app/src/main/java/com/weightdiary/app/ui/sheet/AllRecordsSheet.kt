@@ -47,7 +47,7 @@ fun AllRecordsSheet(
     snackbarHostState: SnackbarHostState,
     onDismiss: () -> Unit,
     onRowClick: (RecordRow) -> Unit,
-    onRowLongClick: (RecordRow) -> Unit,
+    onRowDelete: (RecordRow) -> Unit,
 ) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
@@ -86,8 +86,7 @@ fun AllRecordsSheet(
                     SwipeToDeleteRow(
                         row = row,
                         onClick = { onRowClick(row) },
-                        onLongClick = { onRowLongClick(row) },
-                        onDelete = { onRowLongClick(row) },
+                        onDelete = { onRowDelete(row) },
                     )
                     Box(
                         modifier = Modifier

@@ -95,16 +95,6 @@ class WeightRepository(
         dao.deleteById(id)
     }
 
-    /**
-     * 撤销删除：**用原 id 原样写回**。
-     *
-     * 不能走 [add] —— 那会分配一个新 id，撤销后行的身份就变了，
-     * 列表的 key、编辑态、图表里选中点全都对不上。
-     */
-    suspend fun restore(record: WeightRecord) {
-        dao.insert(record.toEntity())
-    }
-
     suspend fun setHeight(heightCm: Double?) = profileStore.setHeight(heightCm)
 
     suspend fun setTargetWeight(targetWeightKg: Double?, setAtWeightKg: Double?) =

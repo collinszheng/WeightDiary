@@ -6,7 +6,6 @@ import com.weightdiary.app.domain.chart.Granularity
 import com.weightdiary.app.domain.chart.YAxis
 import com.weightdiary.app.domain.model.BmiLevel
 import com.weightdiary.app.domain.model.Metric
-import com.weightdiary.app.domain.model.WeightRecord
 import com.weightdiary.app.domain.record.RecordRow
 import java.time.Instant
 
@@ -115,8 +114,5 @@ data class GoalUi(
 sealed interface HomeEvent {
     data class RecordSaved(val id: Long, val weightKg: Double) : HomeEvent
     data object ProfileSaved : HomeEvent
-
-    /** 删除后给出足够信息以便原样撤销（含原 id） */
-    data class RecordDeleted(val record: WeightRecord) : HomeEvent
     data object RecordUpdated : HomeEvent
 }

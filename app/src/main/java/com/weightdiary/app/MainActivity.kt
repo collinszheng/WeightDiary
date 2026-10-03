@@ -93,17 +93,6 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
                 HomeEvent.RecordUpdated -> snackbarHostState.showSnackbar(
                     context.getString(R.string.snack_record_updated),
                 )
-
-                is HomeEvent.RecordDeleted -> {
-                    val result = snackbarHostState.showSnackbar(
-                        message = context.getString(R.string.snack_record_deleted),
-                        actionLabel = context.getString(R.string.action_undo),
-                        duration = SnackbarDuration.Long,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        viewModel.undoDelete(event.record)
-                    }
-                }
             }
         }
     }
@@ -117,7 +106,7 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             onChartTabSelected = viewModel::selectTab,
             onShiftRange = viewModel::shiftRange,
             onRecordClick = { viewModel.startEdit(it) },
-            onRecordLongClick = viewModel::deleteRecord,
+            onRecordDelete = viewModel::deleteRecord,
             onViewAllRecords = { viewModel.openSheet(ActiveSheet.ALL_RECORDS) },
         )
 
@@ -163,7 +152,7 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             snackbarHostState = snackbarHostState,
             onDismiss = viewModel::dismissSheet,
             onRowClick = { viewModel.startEdit(it, fromAllRecords = true) },
-            onRowLongClick = viewModel::deleteRecord,
+            onRowDelete = viewModel::deleteRecord,
         )
 
         ActiveSheet.EDIT_PROFILE -> EditProfileSheet(

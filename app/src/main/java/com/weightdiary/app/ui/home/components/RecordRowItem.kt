@@ -1,6 +1,6 @@
 package com.weightdiary.app.ui.home.components
 
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,13 +34,13 @@ private val ROW_HEIGHT = 56.dp
  * 历史记录的一行。首页历史列表与「全部记录」弹窗共用同一个组件 ——
  * 设计规范明确要求两侧「行内容一致」，共用一个组件是唯一能保证不跑偏的做法。
  *
- * @param onLongClick 长按删除。设计规范写的是「长按**或**左滑」，这里实现长按
+ * 删除不在这一层：左滑露出按钮由 [SwipeToDeleteRow] 包在外面负责。
+ * 长按入口已取消 —— 它没有任何视觉提示，且取消撤销后误触不可恢复。
  */
 @Composable
 fun RecordRowItem(
     row: RecordRow,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = WeightDiaryTheme.colors
@@ -55,11 +55,7 @@ fun RecordRowItem(
             .fillMaxWidth()
             // heightIn 而不是 height：字体放大后行内容要能撑开（设计规范 §8）
             .heightIn(min = ROW_HEIGHT)
-            .combinedClickable(
-                role = Role.Button,
-                onClick = onClick,
-                onLongClick = onLongClick,
-            )
+            .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description }
             .padding(horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,

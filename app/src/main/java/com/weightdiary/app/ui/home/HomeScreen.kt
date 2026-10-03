@@ -49,7 +49,7 @@ fun HomeScreen(
     onChartTabSelected: (ChartTab) -> Unit,
     onShiftRange: (Int) -> Unit,
     onRecordClick: (RecordRow) -> Unit,
-    onRecordLongClick: (RecordRow) -> Unit,
+    onRecordDelete: (RecordRow) -> Unit,
     onViewAllRecords: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -132,7 +132,7 @@ fun HomeScreen(
                 totalCount = state.recordCount,
                 hasMore = state.hasMoreRecords,
                 onRowClick = onRecordClick,
-                onRowLongClick = onRecordLongClick,
+                onRowDelete = onRecordDelete,
                 onViewMore = onViewAllRecords,
                 modifier = Modifier.padding(horizontal = dimen.pageHorizontal),
             )

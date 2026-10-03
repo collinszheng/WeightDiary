@@ -185,22 +185,20 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
         }
     }
 
-    // ─────────────── 删除与撤销 ───────────────
+    // ─────────────── 删除 ───────────────
 
+    /**
+     * 删除一条记录。
+     *
+     * 这是**不可撤销**的 —— 防误删由「左滑露出按钮 + 点按钮二次确认」承担，
+     * 因此不再有「已删除」的撤销 Snackbar。
+     */
     fun deleteRecord(row: RecordRow) {
         viewModelScope.launch {
-            // 先把整条记录取出来，撤销时才能原样写回（含原 id）
-            val record = repository.findById(row.id) ?: return@launch
             repository.delete(row.id)
             // 从编辑弹窗里删的，删完要把弹窗关掉；从列表里删的则留在列表继续删
             if (activeSheet.value == ActiveSheet.ADD_RECORD) closeSheet()
-            _events.send(HomeEvent.RecordDeleted(record))
         }
-    }
-
-    /** Snackbar 上的「撤销」。用原 id 写回，行的身份不变。 */
-    fun undoDelete(record: WeightRecord) {
-        viewModelScope.launch { repository.restore(record) }
     }
 
     // ─────────────── 个人资料 ───────────────
