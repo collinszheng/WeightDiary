@@ -10,6 +10,47 @@ class ChartScaffolderTest {
 
     private val zone = ZoneId.of("UTC")
 
+    // ─────────────── Y 轴：数据居中 ───────────────
+
+    /**
+     * 用户反馈：折线总是贴在图表下半部分。
+     *
+     * 原因是下界原本用 `floor(lo / M) * M` —— 只会往下掉、从不往上抬，
+     * 数据自然永远偏下。改成为「让数据居中」的那个步长整数倍之后就正常了。
+     */
+    @Test
+    fun `数据落在刻度窗口中段 - 用户实测场景`() {
+        // 一周数据 68.32–68.90。旧算法给 68/69/70/71，折线挤在下半部分
+        val axis = ChartScaffolder.buildYAxis(listOf(68.32, 68.4, 68.74, 68.5, 68.9, 68.7, 68.52))
+        assertEquals(
+            "应当得到 67/68/69/70",
+            listOf(67.0, 68.0, 69.0, 70.0),
+            axis.majorTicks,
+        )
+    }
+
+    @Test
+    fun `数据中点与窗口中点的偏差不超过一个主步长`() {
+        var seed = 99L
+        fun nextDouble(): Double {
+            seed = (seed * 6364136223846793005L + 1442695040888963407L)
+            return ((seed ushr 11).toDouble() / (1L shl 53).toDouble())
+        }
+        repeat(300) {
+            val base = 20.0 + nextDouble() * 90.0
+            val width = 0.1 + nextDouble() * 20.0
+            val values = List(2 + (nextDouble() * 6).toInt()) { base + nextDouble() * width }
+
+            val axis = ChartScaffolder.buildYAxis(values)
+            val dataCenter = (values.min() + values.max()) / 2
+            val windowCenter = (axis.lower + axis.upper) / 2
+            assertTrue(
+                "values=$values 数据中点 $dataCenter 偏离窗口中点 $windowCenter 超过一个主步长 ${axis.majorStep}",
+                kotlin.math.abs(dataCenter - windowCenter) <= axis.majorStep + 1e-6,
+            )
+        }
+    }
+
     // ─────────────── Y 轴：必须真的覆盖住数据 ───────────────
 
     /**

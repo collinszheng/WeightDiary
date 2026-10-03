@@ -1,12 +1,7 @@
 package com.weightdiary.app.ui.home.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.splineBasedDecay
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,33 +35,24 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.domain.chart.ChartPoint
-import com.weightdiary.app.domain.chart.Granularity
 import com.weightdiary.app.domain.chart.MonotoneCubic
-import com.weightdiary.app.domain.chart.YAxis
 import com.weightdiary.app.ui.home.ChartUi
 import com.weightdiary.app.ui.home.GoalOffscreen
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
-import kotlinx.coroutines.launch
 import java.time.Instant
-import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 
 private val Y_LABEL_WIDTH = 34.dp
 private val Y_TITLE_HEIGHT = 16.dp
 private val X_LABEL_HEIGHT = 18.dp
-private val DOT_RADIUS = 4.dp
-private val DOT_STROKE = 2.dp
 private val LINE_WIDTH = 2.dp
 
-/**
- * 横向视口的单位密度。只有「日历单位数 × 这个密度」超过绘图区宽度时才真正可滚动。
- *
- * 后果是**「日」「周」「年」视图滑动不会有任何效果**（单位太少，内容没占满），
- * 只有「月」（30 天 × 12dp = 360dp，勉强超出）和跨度很大的「总」才滚得动。
- * 这是 [docs/05-交付计划.md] 里 R10 记下的已知取舍。
- */
-private val UNIT_DENSITY = 12.dp
+/** 空心实测点的半径上限。点数多时会按密度自动缩小 */
+private val DOT_RADIUS_MAX = 4.dp
+private val DOT_RADIUS_MIN = 1.dp
+
+/** 相邻两点的像素间距乘这个系数就是点半径 —— 保证点之间始终留得出空隙 */
+private const val DOT_RADIUS_SPACING_RATIO = 0.22f
 
 /** 点击命中半径。只看横向距离 —— 点在某一点的「列」里就算命中，不必精确戳中圆点 */
 private val HIT_RADIUS = 24.dp
@@ -75,12 +60,11 @@ private val HIT_RADIUS = 24.dp
 /**
  * 折线图。自绘 Canvas（决策 Q3）。
  *
- * 绘制层级自下而上：次刻度 → 主刻度 + 数字 → 渐变填充 → 目标虚线 → 折线 → 空心实测点 → X 轴标签 → 气泡。
+ * **整段范围一次画完，图表区不响应横向手势。** 早先做过「内容超出视口就横向滚动」，
+ * 但月/年/总三个视图的数据都会被塞进一屏，滚动既难发现、又和页面纵向滚动打架，
+ * 收益不抵复杂度，已移除。切换时间段只走左右的箭头。
  *
- * **手势职责划分**（决策记录「冲突 1」）：
- * - 图表内左右滑动 = 滚动视口，**不切换日期范围**
- * - 切换范围只能点左右箭头
- * - 纵向滑动交给外层的页面滚动：`draggable` 只判横向，纵向达不到横向 slop，事件自然留给父级
+ * 绘制层级自下而上：次刻度 → 主刻度 + 数字 → 渐变填充 → 目标虚线 → 折线 → 空心实测点 → X 轴标签 → 气泡。
  */
 @Composable
 fun WeightChart(
@@ -106,11 +90,9 @@ fun WeightChart(
     val end = chart.end
     val density = LocalDensity.current
 
-    // 换 Tab / 换范围时重置滚动位置与选中点
+    // 换 Tab / 换范围时清掉选中点
     val rangeKey = listOf(chart.tab, start, end)
-    val scroll = remember(rangeKey) { Animatable(0f) }
     var selected by remember(rangeKey) { mutableStateOf<ChartPoint?>(null) }
-    val scope = rememberCoroutineScope()
 
     if (axis == null || points.isEmpty() || start == null || end == null) {
         ChartEmptyState(text = "", modifier = modifier)
@@ -118,42 +100,37 @@ fun WeightChart(
     }
 
     BoxWithConstraints(modifier = modifier) {
-        // ── 几何全部在这里算好 ──
-        // 命中测试要在点击回调里跑，而回调不在绘制作用域内，所以不能等到绘制阶段才算坐标
+        // 几何全部在这里算好 —— 命中测试要在点击回调里跑，而回调不在绘制作用域内
         val plotLeft = with(density) { Y_LABEL_WIDTH.toPx() }
-        val plotRight = with(density) { maxWidth.toPx() - DOT_RADIUS.toPx() }
+        val plotRight = with(density) { maxWidth.toPx() }
         val plotTop = with(density) { Y_TITLE_HEIGHT.toPx() }
         val plotBottom = with(density) { maxHeight.toPx() - X_LABEL_HEIGHT.toPx() }
         val plotWidth = (plotRight - plotLeft).coerceAtLeast(1f)
         val hitRadiusPx = with(density) { HIT_RADIUS.toPx() }
 
-        val contentWidthPx = countUnits(chart) * with(density) { UNIT_DENSITY.toPx() }
-        val maxScrollPx = (contentWidthPx - plotWidth).coerceAtLeast(0f)
-        val scrollPx = scroll.value.coerceIn(0f, maxScrollPx)
-
-        // 内容比视口窄时（周视图只有 7×12dp）必须**拉伸铺满**，否则下面按比例算出的
-        // 可视窗口会比整段范围还宽，X 轴标签跑到范围之外、曲线挤在左边一小块
-        val effectiveContentWidthPx = contentWidthPx.coerceAtLeast(plotWidth)
-
         val rangeMs = (end.toEpochMilli() - start.toEpochMilli()).toDouble().coerceAtLeast(1.0)
-        val visibleStartMs = start.toEpochMilli() + (scrollPx / effectiveContentWidthPx) * rangeMs
-        val visibleSpanMs = (plotWidth / effectiveContentWidthPx) * rangeMs
 
         fun xOf(time: Instant): Float =
-            (plotLeft + ((time.toEpochMilli() - visibleStartMs) / visibleSpanMs) * plotWidth).toFloat()
+            (plotLeft + ((time.toEpochMilli() - start.toEpochMilli()) / rangeMs) * plotWidth).toFloat()
 
         fun yOf(value: Double): Float =
             (plotBottom - axis.normalize(value) * (plotBottom - plotTop)).toFloat()
 
-        val visible = pointsWithNeighbours(points, visibleStartMs, visibleStartMs + visibleSpanMs)
+        // 点半径随密度自适应：周视图 7 个点保持原来大小，
+        // 总视图 110 个点自动缩小，否则点会挤成一条链
+        val spacingPx = if (points.size > 1) plotWidth / (points.size - 1) else plotWidth
+        val dotRadius = (spacingPx * DOT_RADIUS_SPACING_RATIO).coerceIn(
+            with(density) { DOT_RADIUS_MIN.toPx() },
+            with(density) { DOT_RADIUS_MAX.toPx() },
+        )
+        val dotStroke = (dotRadius * 0.5f).coerceIn(with(density) { 0.6.dp.toPx() }, with(density) { 2.dp.toPx() })
 
-        // 每次重组都会生成新的闭包，用 rememberUpdatedState 保证点击回调用的是最新那份，
-        // 同时 pointerInput 的 key 保持稳定、不打断手势
+        // 每次重组都会生成新的闭包，用 rememberUpdatedState 保证点击回调用的是最新那份
         val hitTest by rememberUpdatedState<(Offset) -> ChartPoint?> { tap ->
             if (tap.y !in plotTop..plotBottom) {
                 null
             } else {
-                visible
+                points
                     .minByOrNull { abs(xOf(it.time) - tap.x) }
                     ?.takeIf { abs(xOf(it.time) - tap.x) <= hitRadiusPx }
             }
@@ -162,23 +139,6 @@ fun WeightChart(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    enabled = maxScrollPx > 0f,
-                    state = rememberDraggableState { delta ->
-                        scope.launch {
-                            scroll.snapTo((scroll.value - delta).coerceIn(0f, maxScrollPx))
-                        }
-                    },
-                    onDragStarted = { selected = null },
-                    onDragStopped = { velocity ->
-                        scope.launch {
-                            scroll.updateBounds(0f, maxScrollPx)
-                            // 惯性滑动，到边界停住（不自动翻页）
-                            scroll.animateDecay(-velocity, splineBasedDecay(density))
-                        }
-                    },
-                )
                 .pointerInput(Unit) {
                     detectTapGestures { tap -> selected = hitTest(tap) }
                 },
@@ -197,8 +157,8 @@ fun WeightChart(
             }
 
             // ── 3~6. 折线相关全部裁剪在绘图区内 ──
-            val xs = visible.map { xOf(it.time).toDouble() }
-            val ys = visible.map { yOf(it.value).toDouble() }
+            val xs = points.map { xOf(it.time).toDouble() }
+            val ys = points.map { yOf(it.value).toDouble() }
             val linePath = buildSmoothPath(xs, ys)
 
             clipRect(plotLeft, plotTop, plotRight, plotBottom) {
@@ -246,17 +206,17 @@ fun WeightChart(
                 }
 
                 // 空心圆点 = 真实测量；选中的那个改成实心
-                visible.forEachIndexed { index, point ->
+                points.forEachIndexed { index, point ->
                     val center = Offset(xs[index].toFloat(), ys[index].toFloat())
                     if (point.sourceRecordId == selected?.sourceRecordId) {
-                        drawCircle(colors.accent, radius = DOT_RADIUS.toPx(), center = center)
+                        drawCircle(colors.accent, radius = dotRadius, center = center)
                     } else {
-                        drawCircle(Color.White, radius = DOT_RADIUS.toPx(), center = center)
+                        drawCircle(Color.White, radius = dotRadius, center = center)
                         drawCircle(
                             color = colors.accent,
-                            radius = DOT_RADIUS.toPx(),
+                            radius = dotRadius,
                             center = center,
-                            style = Stroke(width = DOT_STROKE.toPx()),
+                            style = Stroke(width = dotStroke),
                         )
                     }
                 }
@@ -281,18 +241,18 @@ fun WeightChart(
                 drawGoalArrow(colors.accent, chart.goalOffscreen, plotLeft, plotTop, plotBottom)
             }
 
-            // ── 7. X 轴标签：按**可视窗口**重新四等分（滚动时实时重算）──
+            // ── 7. X 轴标签：按整段范围四等分 ──
             // 先量一遍 5 个候选标签。系统字体放大后它们会互相压住 ——
             // 重叠成一团的日期比少显示几个日期更难读，所以放不下就减少数量。
             val probe = (0..4).map { i ->
-                formatX(Instant.ofEpochMilli((visibleStartMs + visibleSpanMs * i / 4).toLong()))
+                formatX(Instant.ofEpochMilli((start.toEpochMilli() + rangeMs * i / 4).toLong()))
             }
             val widest = probe.maxOf { textMeasurer.measure(it, axisStyle).size.width }
             val labelCount = ((plotWidth / (widest * 1.35f)).toInt()).coerceIn(2, 5)
 
             val labelTimes = (0 until labelCount).map { i ->
                 Instant.ofEpochMilli(
-                    (visibleStartMs + visibleSpanMs * i / (labelCount - 1)).toLong(),
+                    (start.toEpochMilli() + rangeMs * i / (labelCount - 1)).toLong(),
                 )
             }
             labelTimes.forEachIndexed { index, time ->
@@ -324,7 +284,7 @@ fun WeightChart(
                         background = colors.textPrimary,
                         anchor = Offset(cx, yOf(point.value)),
                         bounds = Rect(plotLeft, plotTop, plotRight, plotBottom),
-                        dotRadius = DOT_RADIUS.toPx(),
+                        dotRadius = dotRadius,
                         corner = 8.dp.toPx(),
                         padH = 10.dp.toPx(),
                         padV = 6.dp.toPx(),
@@ -334,45 +294,6 @@ fun WeightChart(
             }
         }
     }
-}
-
-/**
- * 内容宽度按「日历单位数 × 密度」算。
- *
- * 单位随粒度变：按小时 / 按天 / 按月。这就决定了哪些视图真的需要滚动 ——
- * 日 24 个单位、周 7 个、月 30 个、年 12 个。
- */
-private fun countUnits(chart: ChartUi): Int {
-    val start = chart.start ?: return 0
-    val end = chart.end ?: return 0
-    return when (chart.granularity) {
-        Granularity.RAW -> 24
-
-        Granularity.DAILY ->
-            (((end.toEpochMilli() - start.toEpochMilli()) / 86_400_000L) + 1).toInt().coerceAtLeast(1)
-
-        Granularity.MONTHLY -> {
-            val zone = ZoneId.systemDefault()
-            val from = start.atZone(zone).toLocalDate().withDayOfMonth(1)
-            val to = end.atZone(zone).toLocalDate().withDayOfMonth(1)
-            (ChronoUnit.MONTHS.between(from, to) + 1).toInt().coerceAtLeast(1)
-        }
-    }
-}
-
-/** 取可视窗口内的点，并把两侧各一个相邻点带上，保证线段在窗口边缘不断 */
-private fun pointsWithNeighbours(
-    points: List<ChartPoint>,
-    visibleStartMs: Double,
-    visibleEndMs: Double,
-): List<ChartPoint> {
-    if (points.isEmpty()) return emptyList()
-    val first = points.indexOfFirst { it.time.toEpochMilli() >= visibleStartMs }
-    val last = points.indexOfLast { it.time.toEpochMilli() <= visibleEndMs }
-    if (first < 0 || last < 0 || first > last) return emptyList()
-    val from = (first - 1).coerceAtLeast(0)
-    val to = (last + 1).coerceAtMost(points.lastIndex)
-    return points.subList(from, to + 1)
 }
 
 private fun DrawScope.drawGoalArrow(

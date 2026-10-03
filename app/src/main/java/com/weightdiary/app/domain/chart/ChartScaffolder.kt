@@ -83,24 +83,38 @@ object ChartScaffolder {
         val pad = (max - min) * PADDING_RATIO
         val lo = min - pad
         val hi = max + pad
+        val center = (lo + hi) / 2.0
 
-        // 候选步长按升序取第一个「能真正覆盖住留边后的数据、又能整除出干净次步长」的。
+        // 候选步长按升序取第一个「能覆盖住留边后的数据、又能整除出干净次步长」的。
         //
-        // 判据必须是「lower + 3M >= hi」而不是「3M >= 跨度」：下界向下取整会掉到 lo 以下，
-        // 吃掉 3M 的预算。用后者会让上界低于数据最大值，折线顶部被裁掉。
+        // 下界的取法是 **吸附到离「让数据居中」最近的那个步长整数倍**，
+        // 而不是 floor(lo / M) * M —— 后者只会往下掉、从不往上抬，
+        // 结果就是数据永远贴在窗口下半部分，折线看着很靠下。
+        //
+        // 覆盖判据仍用 lo / hi：居中优先，但绝不能把数据挤出窗口。
         val candidates = candidateSteps()
         val majorStep = candidates.firstOrNull { step ->
-            val lower = floor(lo / step) * step
-            lower + 3 * step >= hi - 1e-9 && SUBDIVISION_CANDIDATES.any { isClean(step / it) }
+            val lower = snapCentered(center, step)
+            lower <= lo + 1e-9 &&
+                lower + 3 * step >= hi - 1e-9 &&
+                SUBDIVISION_CANDIDATES.any { isClean(step / it) }
         } ?: candidates.last()
 
         val subdivisions = SUBDIVISION_CANDIDATES.first { isClean(majorStep / it) }
 
-        val lower = floor(lo / majorStep) * majorStep
+        val lower = snapCentered(center, majorStep)
         val upper = lower + 3 * majorStep
 
         return YAxis(lower = lower, upper = upper, majorStep = majorStep, subdivisions = subdivisions)
     }
+
+    /**
+     * 把窗口下界吸附到步长的整数倍，且尽量让 [center] 落在窗口正中。
+     *
+     * 理想下界是 `center - 1.5M`；把它四舍五入到最近的 `M` 的整数倍即可。
+     */
+    private fun snapCentered(center: Double, step: Double): Double =
+        Math.round((center - 1.5 * step) / step).toDouble() * step
 
     /**
      * 目标线要不要纳入 Y 轴范围（决策 B8）。
