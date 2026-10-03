@@ -17,3 +17,9 @@ local.properties
 
 # 构建产物（模块级另有 app/.gitignore，此处兜底）
 build/
+
+keystore.properties
+keystore/
+*.jks
+*.keystore
+dist/
