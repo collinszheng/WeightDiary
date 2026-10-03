@@ -228,16 +228,13 @@ private fun DateRangePicker(
 ) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
-    val shape = RoundedCornerShape(WeightDiaryTheme.dimens.radiusTabContainer)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // heightIn：字体放大后日期范围要折两行，固定 36dp 会把第二行裁掉
-            .heightIn(min = 36.dp)
-            .clip(shape)
-            .background(colors.fieldFill)
-            .padding(horizontal = 4.dp, vertical = 2.dp),
+            // 整行不再有灰底 —— 底色改由两个箭头各自携带，用来表示「能不能点」。
+            // 高度取 48dp 是为了容下箭头的触摸区（无障碍要求）
+            .heightIn(min = WeightDiaryTheme.dimens.minTouchTarget),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RangeArrow(
@@ -266,6 +263,12 @@ private fun DateRangePicker(
     }
 }
 
+/**
+ * 日期范围箭头。
+ *
+ * 底色是**可用性的指示**：可用时有灰色圆角矩形，到头了就没有底色、只剩淡箭头。
+ * 这比只把箭头调淡更容易区分 —— 尤其是左右一个可用、一个不可用时。
+ */
 @Composable
 private fun RangeArrow(
     pointsLeft: Boolean,
@@ -274,12 +277,15 @@ private fun RangeArrow(
     onClick: () -> Unit,
 ) {
     val colors = WeightDiaryTheme.colors
+    val dimen = WeightDiaryTheme.dimens
     val tint = if (enabled) colors.textSecondary else colors.textDisabled
+    val chipShape = RoundedCornerShape(dimen.radiusTabContainer)
 
     Box(
         modifier = Modifier
-            .size(32.dp)
-            .clip(RoundedCornerShape(8.dp))
+            // 触摸区 48dp（无障碍要求），视觉上的圆角矩形只有 32dp
+            .size(dimen.minTouchTarget)
+            .clip(RoundedCornerShape(12.dp))
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics {
                 contentDescription = description
@@ -287,25 +293,32 @@ private fun RangeArrow(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(12.dp)) {
-            val stroke = 1.5.dp.toPx()
-            // 尖角在箭头的指向那一侧：向左的箭头尖角在左（0.15），向右的在右（0.85）
-            val apex = if (pointsLeft) 0.15f else 0.85f
-            val base = if (pointsLeft) 0.85f else 0.15f
-            drawLine(
-                color = tint,
-                start = Offset(size.width * base, size.height * 0.15f),
-                end = Offset(size.width * apex, size.height * 0.5f),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round,
-            )
-            drawLine(
-                color = tint,
-                start = Offset(size.width * apex, size.height * 0.5f),
-                end = Offset(size.width * base, size.height * 0.85f),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round,
-            )
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .then(if (enabled) Modifier.background(colors.fieldFill, chipShape) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.size(12.dp)) {
+                val stroke = 1.5.dp.toPx()
+                // 尖角在箭头的指向那一侧：向左的箭头尖角在左（0.15），向右的在右（0.85）
+                val apex = if (pointsLeft) 0.15f else 0.85f
+                val base = if (pointsLeft) 0.85f else 0.15f
+                drawLine(
+                    color = tint,
+                    start = Offset(size.width * base, size.height * 0.15f),
+                    end = Offset(size.width * apex, size.height * 0.5f),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round,
+                )
+                drawLine(
+                    color = tint,
+                    start = Offset(size.width * apex, size.height * 0.5f),
+                    end = Offset(size.width * base, size.height * 0.85f),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Round,
+                )
+            }
         }
     }
 }
