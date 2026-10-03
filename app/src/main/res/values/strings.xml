@@ -1,3 +1,36 @@
 <resources>
     <string name="app_name">体重日记</string>
+
+    <!-- 概览卡片 -->
+    <string name="metric_weight">体重（公斤）</string>
+    <string name="metric_bmi">BMI</string>
+    <string name="metric_body_fat">体脂率（%）</string>
+    <string name="metric_height">身高（厘米）</string>
+    <string name="value_placeholder">--</string>
+
+    <!-- 目标与水平卡片 -->
+    <string name="label_current_target_weight">当前 / 目标体重 (公斤)</string>
+    <string name="label_level">水平</string>
+    <string name="label_bmi_value">BMI %1$s</string>
+    <string name="goal_not_set">未设置</string>
+
+    <!-- BMI 等级 -->
+    <string name="level_underweight">较轻</string>
+    <string name="level_normal">标准</string>
+    <string name="level_overweight">超重</string>
+    <string name="level_obese">肥胖</string>
+
+    <!-- 操作 -->
+    <string name="action_add_record">添加数据</string>
+    <string name="action_edit_profile">编辑个人资料</string>
+
+    <!-- 拼装片段 -->
+    <string name="unit_kg">kg</string>
+    <string name="unit_cm">cm</string>
+    <string name="unit_percent">%</string>
+    <string name="delta_down">↓ %1$s</string>
+    <string name="delta_up">↑ %1$s</string>
+    <string name="delta_flat">— %1$s</string>
+    <string name="time_today">今天 %1$s</string>
+    <string name="time_yesterday">昨天 %1$s</string>
 </resources>

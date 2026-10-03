@@ -101,6 +101,29 @@ class BmiClassifierTest {
         }
     }
 
+    /**
+     * M1 出口标准里点名的一组值，逐个验一遍「滑块落在哪一段」。
+     *
+     * 与上面的扫描测试是同一个不变量，这里用具体值再钉一次，避免以后扫描步长被改小/改大而漏掉。
+     */
+    @Test
+    fun `M1 出口标准点名的 BMI 值 - 滑块色块与分级一致`() {
+        val expected = mapOf(
+            17.0 to 0, // 黄 较轻
+            19.0 to 1, // 绿 标准
+            22.0 to 1,
+            25.0 to 2, // 浅红 超重
+            29.0 to 3, // 深红 肥胖
+            33.0 to 3,
+        )
+        expected.forEach { (bmi, segment) ->
+            val pos = BmiClassifier.sliderPosition(bmi)
+            val actual = (pos * BmiClassifier.SEGMENT_COUNT).toInt()
+                .coerceIn(0, BmiClassifier.SEGMENT_COUNT - 1)
+            assertEquals("BMI=$bmi", segment, actual)
+        }
+    }
+
     @Test
     fun `四段边界之和覆盖完整区间`() {
         val bounds = BmiClassifier.sliderBounds(BmiStandard.CHINA)

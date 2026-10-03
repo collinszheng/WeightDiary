@@ -4,8 +4,9 @@ from PIL import Image, ImageDraw, ImageFont, ImageChops
 import math
 
 S = 3                      # px per dp
-SCREEN_W = 393
-TOTAL_H = 982
+SCREEN_W = 411   # 与测试设备一致：1080px / 420dpi = 411.4dp
+STATUS_H = 23      # 真机状态栏高度（1080x2400 @420dpi 上是 63px）
+TOTAL_H = 961
 
 WHITE = (255, 255, 255)
 CARD = (250, 250, 250)
@@ -60,7 +61,7 @@ def rrect(x0, y0, x1, y1, r, fill=None, outline=None, width=1):
 
 # ══════════════════════ 状态栏 ══════════════════════
 txt(20, 13, "14:32", 13, PRI)
-bx = 393 - 20
+bx = SCREEN_W - 20
 d.rounded_rectangle([P(bx - 22), P(16), P(bx - 4), P(26)], radius=P(2.5), fill=PRI)
 d.rounded_rectangle([P(bx - 20.5), P(17.5), P(bx - 6.5), P(24.5)], radius=P(1.5), fill=WHITE)
 for i, h in enumerate([5, 7.5, 10]):
@@ -68,14 +69,14 @@ for i, h in enumerate([5, 7.5, 10]):
 d.arc([P(bx - 40), P(14), P(bx - 26), P(28)], 200, 340, fill=PRI, width=int(2 * S))
 
 # ══════════════════════ 顶部导航栏 ══════════════════════
-txt(SCREEN_W / 2, 44 + 18, "体重日记", 17, PRI, bold=True, anchor="ma")
-cx, cy, rr = 393 - 16 - 14, 44 + 28, 14
+txt(SCREEN_W / 2, STATUS_H + 18, "体重日记", 17, PRI, bold=True, anchor="ma")
+cx, cy, rr = SCREEN_W - 16 - 14, STATUS_H + 28, 14
 d.ellipse([P(cx - rr), P(cy - rr), P(cx + rr), P(cy + rr)], outline=PRI, width=int(round(1.5 * S)))
 d.line([P(cx - 6), P(cy), P(cx + 6), P(cy)], fill=PRI, width=int(round(1.5 * S)))
 d.line([P(cx), P(cy - 6), P(cx), P(cy + 6)], fill=PRI, width=int(round(1.5 * S)))
 
 # ══════════════════════ 概览卡片行 ══════════════════════
-mt, mh, mw, gap = 108, 96, 112, 10
+mt, mh, mw, gap = STATUS_H + 64, 96, 112, 10
 cards = [
     ("体重（公斤）", "68.5", True, "↓ 0.3", "今天 20:15"),
     ("BMI", "22.4", False, None, None),
@@ -95,8 +96,8 @@ for i, (label, val, sel, delta, when) in enumerate(cards):
         txt(x + mw - 12, mt + 68, when, 10, DIS, anchor="ra")
 
 # ══════════════════════ 目标与水平卡片 ══════════════════════
-gt, gh = 216, 110
-rrect(16, gt, 377, gt + gh, 20, fill=CARD, outline=BORDER, width=0.5)
+gt, gh = STATUS_H + 172, 110
+rrect(16, gt, SCREEN_W - 16, gt + gh, 20, fill=CARD, outline=BORDER, width=0.5)
 txt(32, gt + 14, "当前 / 目标体重 (公斤)", 12, SEC)
 txt(32, gt + 36, "68.5", 28, PRI, bold=True)
 txt(32 + 62, gt + 44, "/", 24, DIS)
@@ -106,12 +107,13 @@ ex, ey = 32 + 126, gt + 56
 d.line([(P(ex - 4.5), P(ey + 4.5)), (P(ex + 4.5), P(ey - 4.5))], fill=SEC, width=int(round(2.4 * S)))
 d.polygon([(P(ex - 7), P(ey + 7)), (P(ex - 2.5), P(ey + 6.2)), (P(ex - 6.2), P(ey + 2.5))], fill=SEC)
 # 目标进度条
-pb_y = gt + 84
+pb_y = gt + 93      # 距卡片底 14dp，与 Compose 侧的 padding 对齐
 rrect(32, pb_y, 32 + 180, pb_y + 3, 1.5, fill=DIV)
 rrect(32, pb_y, 32 + 180 * 0.69, pb_y + 3, 1.5, fill=ACCENT)
 
 # 右栏：水平（四段等宽）
-rx0, rx1 = 232, 361
+rx1 = SCREEN_W - 32      # 右栏固定 129dp，贴卡片右内边
+rx0 = rx1 - 129
 txt((rx0 + rx1) / 2, gt + 14, "水平", 12, SEC, anchor="ma")
 bar_y, bar_h = gt + 40, 10
 for i, col in enumerate([BMI_Y, BMI_G, BMI_LR, BMI_DR]):
@@ -131,10 +133,10 @@ txt((rx0 + rx1) / 2, gt + 58, "标准", 15, PRI, bold=True, anchor="ma")
 txt((rx0 + rx1) / 2, gt + 82, "BMI 22.4", 11, SEC, anchor="ma")
 
 # ══════════════════════ 图表卡片 ══════════════════════
-ct = 338
+ct = STATUS_H + 294
 CH = 356
-rrect(16, ct, 377, ct + CH, 20, fill=CARD, outline=BORDER, width=0.5)
-cx0, cx1 = 32, 361
+rrect(16, ct, SCREEN_W - 16, ct + CH, 20, fill=CARD, outline=BORDER, width=0.5)
+cx0, cx1 = 32, SCREEN_W - 32
 
 # Tab
 tabs = ["日", "周", "月", "年", "总"]
@@ -265,9 +267,9 @@ for i, (x, day) in enumerate(label_pos):
     txt(x, PB + 8, f"6月{day}日", 10, SEC, anchor=anchor)
 
 # ══════════════════════ 历史记录 ══════════════════════
-ht = 712
+ht = STATUS_H + 668
 txt(16, ht, "历史记录", 15, PRI, bold=True)
-txt(377, ht + 2, "共 27 条", 12, SEC, anchor="ra")
+txt(SCREEN_W - 16, ht + 2, "共 27 条", 12, SEC, anchor="ra")
 items = [("68.5", "↓ 0.3", "今天 20:15"), ("68.8", "↑ 0.8", "6月29日 07:20"), ("68.0", "↓ 0.1", "6月28日 07:35")]
 iy = ht + 24
 for val, dl, when in items:
@@ -276,12 +278,12 @@ for val, dl, when in items:
     txt(16 + tw_ + 4, iy + 21, "kg", 12, SEC)
     up = dl.startswith("↑")
     txt(16 + tw_ + 26, iy + 21, dl, 12, (255, 107, 107) if up else ACCENT)
-    txt(377, iy + 20, when, 13, SEC, anchor="ra")
-    d.line([(P(16), P(iy + 56)), (P(377), P(iy + 56))], fill=DIV, width=int(round(0.5 * S)))
+    txt(SCREEN_W - 16, iy + 20, when, 13, SEC, anchor="ra")
+    d.line([(P(16), P(iy + 56)), (P(SCREEN_W - 16), P(iy + 56))], fill=DIV, width=int(round(0.5 * S)))
     iy += 56
 
-rrect(16, 914, 377, 958, 12, fill=DIV)
-txt(SCREEN_W / 2, 928, "查看更多记录", 15, PRI, bold=True, anchor="ma")
+rrect(16, STATUS_H + 870, SCREEN_W - 16, STATUS_H + 914, 12, fill=DIV)
+txt(SCREEN_W / 2, STATUS_H + 884, "查看更多记录", 15, PRI, bold=True, anchor="ma")
 
 img.convert("RGB").save(r"E:\adev\WeightDiary\docs\assets\home.png", quality=95)
 print("saved", img.size)

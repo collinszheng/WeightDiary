@@ -33,6 +33,8 @@ android {
 
     buildFeatures {
         compose = true
+        // DebugSeed 用 BuildConfig.DEBUG 做守卫
+        buildConfig = true
     }
 
     packaging {

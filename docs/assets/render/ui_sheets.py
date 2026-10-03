@@ -3,7 +3,7 @@
 from PIL import Image, ImageDraw, ImageFont
 
 S = 2
-SW, SH = 393, 852
+SW, SH = 411, 852   # 与测试设备一致：1080px / 420dpi
 GAP = 14
 LABEL_H = 30
 
