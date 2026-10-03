@@ -11,12 +11,10 @@
 
 ## 当前进度
 
-**M0 已完成**：项目骨架 + 数据层 + 核心算法与单测。
-
 | 阶段 | 状态 |
 |---|---|
 | M0 项目骨架 + 数据层 | ✅ 完成 |
-| M1 上半屏视觉 | ⏳ 未开始 |
+| M1 上半屏视觉 | 🚧 进行中 |
 | M2 录入流程 | ⏳ 未开始 |
 | M3 图表（自绘 Canvas） | ⏳ 未开始 |
 | M4 列表与记录管理 | ⏳ 未开始 |
@@ -26,18 +24,27 @@
 
 ## 文档
 
-设计文档在本仓库之外，位于 **`E:\adev\docs\`**：
+全部设计文档在 [`docs/`](docs/)，**改任何设定之前先翻 [`04-决策记录.md`](docs/04-决策记录.md)** —— 大部分「为什么不那样做」都有答案和否掉的原因。
 
 | 文档 | 内容 |
 |---|---|
-| [README](E:\adev\docs\README.md) | 文档地图与环境基线 |
-| [01 需求文档](E:\adev\docs\01-需求文档.md) | 产品定位、功能清单、非目标、验收标准 |
-| [02 设计规范](E:\adev\docs\02-设计规范.md) | 设计 token、界面规格、状态、动效 |
-| [03 技术设计](E:\adev\docs\03-技术设计.md) | 架构、数据模型、核心算法、风险 |
-| [04 决策记录](E:\adev\docs\04-决策记录.md) | 全部决策与**被否原因** |
-| [05 交付计划](E:\adev\docs\05-交付计划.md) | 里程碑与出口标准 |
+| [README](docs/README.md) | 文档地图与环境基线 |
+| [01 需求文档](docs/01-需求文档.md) | 产品定位、功能清单、非目标、验收标准 |
+| [02 设计规范](docs/02-设计规范.md) | 设计 token、界面规格、状态、动效 |
+| [03 技术设计](docs/03-技术设计.md) | 架构、数据模型、核心算法、风险 |
+| [04 决策记录](docs/04-决策记录.md) | 全部决策与**被否原因** |
+| [05 交付计划](docs/05-交付计划.md) | 里程碑与出口标准 |
 
-> ⚠️ **改任何设定之前先翻 04 决策记录。** 大部分「为什么不那样做」都有答案。
+### 设计稿
+
+设计稿是**脚本渲染**的高保真图，不是手绘 —— 改完 token 重跑 `docs/assets/render/` 下的脚本即可同步，设计稿不会与文档脱节。
+
+| 稿 | 文件 |
+|---|---|
+| 首页 | [`docs/assets/home.png`](docs/assets/home.png) |
+| 弹窗与空状态 | [`docs/assets/sheets.png`](docs/assets/sheets.png) |
+| 图表刻度对比 | [`docs/assets/chart-ticks.png`](docs/assets/chart-ticks.png) |
+| 折线平滑对比 | [`docs/assets/chart-smooth.png`](docs/assets/chart-smooth.png) |
 
 ## 构建
 
@@ -50,7 +57,7 @@ export GRADLE_OPTS="-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7897 \
 ./gradlew testDebugUnitTest      # 单测
 ```
 
-Android Studio 若同步失败，检查 `Settings → HTTP Proxy`。详见 [03 技术设计 · R2](E:\adev\docs\03-技术设计.md)。
+Android Studio 若同步失败，检查 `Settings → HTTP Proxy`。详见 [03 技术设计 · R2](docs/03-技术设计.md)。
 
 ## 包结构
 
@@ -76,3 +83,9 @@ app/src/test/.../domain/bmi/   15 个单测
 - **Domain 层不依赖 Android**，所有算法是纯函数，可直接 JVM 单测
 - **表结构变更必须写 Migration**，刻意不提供 `fallbackToDestructiveMigration`
 - **数据一律以公制存储**，单位切换只是显示层的事
+- **颜色、字号、间距不写死**，全部走 `ui/theme/` 的 token
+
+## 本机环境注记
+
+- **构建必须走代理**：Java 直连 `services.gradle.org` 超时，走 `127.0.0.1:7897` 才通
+- **`android` CLI 的 `create` 子命令在本机不可用**：它会卡在自己的 `.sdk/lock` 上报错，即使放宽权限也一样；本项目是手工搭建的。遇到同类报错别再折腾权限，直接绕开或用 Android Studio
