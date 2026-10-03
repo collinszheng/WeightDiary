@@ -37,9 +37,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.chart.ChartTab
+import com.weightdiary.app.domain.chart.Granularity
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.ui.common.format1
 import com.weightdiary.app.ui.common.formatShortDateTime
+import com.weightdiary.app.ui.common.formatYearMonth
 import com.weightdiary.app.ui.common.formatXLabel
 import com.weightdiary.app.ui.common.rangeLabel
 import com.weightdiary.app.ui.home.ChartUi
@@ -126,7 +128,13 @@ fun ChartCard(
                     formatTooltip = { point ->
                         val value = point.value.format1()
                         val withUnit = if (unit.isEmpty()) value else "$value $unit"
-                        "$withUnit · ${point.time.formatShortDateTime()}"
+                        // 月聚合点的横坐标是「月中」，不是真实测量时刻 —— 只显示到月，免得误导
+                        val whenText = if (shown.granularity == Granularity.MONTHLY) {
+                            point.time.formatYearMonth()
+                        } else {
+                            point.time.formatShortDateTime()
+                        }
+                        "$withUnit · $whenText"
                     },
                     goalLabel = shown.goalLine?.let { stringResource(R.string.goal_line, it.format1()) },
                     modifier = Modifier.fillMaxSize(),

@@ -112,12 +112,6 @@ fun WeightChart(
 
         val rangeMs = (end.toEpochMilli() - start.toEpochMilli()).toDouble().coerceAtLeast(1.0)
 
-        fun xOf(time: Instant): Float =
-            (plotLeft + ((time.toEpochMilli() - start.toEpochMilli()) / rangeMs) * plotWidth).toFloat()
-
-        fun yOf(value: Double): Float =
-            (plotBottom - axis.normalize(value) * (plotBottom - plotTop)).toFloat()
-
         // 点半径随密度自适应：周视图 7 个点保持原来大小，
         // 总视图 110 个点自动缩小，否则点会挤成一条链
         val spacingPx = if (points.size > 1) plotWidth / (points.size - 1) else plotWidth
@@ -125,7 +119,23 @@ fun WeightChart(
             with(density) { DOT_RADIUS_MIN.toPx() },
             with(density) { DOT_RADIUS_MAX.toPx() },
         )
-        val dotStroke = (dotRadius * 0.5f).coerceIn(with(density) { 0.6.dp.toPx() }, with(density) { 2.dp.toPx() })
+        val dotStroke = (dotRadius * 0.5f).coerceIn(
+            with(density) { 0.6.dp.toPx() },
+            with(density) { 2.dp.toPx() },
+        )
+
+        // 数据的横向映射两侧各内缩一个点半径。
+        // 不缩的话首尾两点正好落在裁剪边界上，空心圆只画得出一半 ——
+        // 月视图的 1 号、以及任何只有零星数据点的视图都会中招。
+        val dataLeft = plotLeft + dotRadius
+        val dataRight = plotRight - dotRadius
+        val dataWidth = (dataRight - dataLeft).coerceAtLeast(1f)
+
+        fun xOf(time: Instant): Float =
+            (dataLeft + ((time.toEpochMilli() - start.toEpochMilli()) / rangeMs) * dataWidth).toFloat()
+
+        fun yOf(value: Double): Float =
+            (plotBottom - axis.normalize(value) * (plotBottom - plotTop)).toFloat()
 
         // 每次重组都会生成新的闭包，用 rememberUpdatedState 保证点击回调用的是最新那份
         val hitTest by rememberUpdatedState<(Offset) -> ChartPoint?> { tap ->

@@ -141,6 +141,25 @@ class AggregatorTest {
 
     // ─────────────── MONTHLY ───────────────
 
+    /**
+     * 月聚合点的横坐标必须是**月中**，不能是该月最后一条记录的时间。
+     * 否则当前月才过几天时（10 月只到 3 号），它的点会紧贴 9 月的点糊成一团。
+     */
+    @Test
+    fun `MONTHLY 的点落在月中而不是最后一条记录的时间`() {
+        val records = listOf(
+            rec(1, "2026-06-01T07:00:00Z", 68.0),
+            rec(2, "2026-06-03T07:00:00Z", 67.0),
+        )
+        val pts = aggregate(records, Granularity.MONTHLY, Metric.WEIGHT)
+        assertEquals(1, pts.size)
+        assertEquals(
+            "点应当落在 6 月 15 日中午",
+            "2026-06-15T12:00:00Z",
+            pts[0].time.toString(),
+        )
+    }
+
     @Test
     fun `MONTHLY 取月平均值`() {
         val records = listOf(

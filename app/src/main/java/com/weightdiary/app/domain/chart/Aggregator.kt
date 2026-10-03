@@ -3,6 +3,7 @@ package com.weightdiary.app.domain.chart
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.model.WeightRecord
 import java.time.Instant
+import java.time.YearMonth
 import java.time.ZoneId
 
 /**
@@ -40,9 +41,13 @@ object Aggregator {
                 .mapNotNull { (_, dayRecords) -> dailyPoint(dayRecords, metric, heightCm) }
 
             Granularity.MONTHLY -> inRange
-                .groupBy { it.measuredAt.atZone(zone).let { z -> z.year * 100 + z.monthValue } }
+                .groupBy {
+                    it.measuredAt.atZone(zone).let { z -> YearMonth.of(z.year, z.monthValue) }
+                }
                 .toSortedMap()
-                .mapNotNull { (_, monthRecords) -> monthlyPoint(monthRecords, metric, heightCm) }
+                .mapNotNull { (month, monthRecords) ->
+                    monthlyPoint(month, monthRecords, metric, heightCm, zone)
+                }
         }
     }
 
@@ -68,19 +73,29 @@ object Aggregator {
     /**
      * 月平均值。这里对指标值直接求平均 —— 平均值不需要「锁定同一条记录」，
      * 因为它是聚合量而不是挑出来的样本。
+     *
+     * 点的横坐标取**月中**（15 日中午），不是该月最后一条记录的时间：
+     * 当前月才过了几天时（比如 10 月只到 3 号），用最后一条记录会让 10 月的点
+     * 紧贴 9 月的点、糊成一团。月中位置也与年视图的 X 轴刻度对齐。
      */
     private fun monthlyPoint(
+        month: YearMonth,
         monthRecords: List<WeightRecord>,
         metric: Metric,
         heightCm: Double?,
+        zone: ZoneId,
     ): ChartPoint? {
         val valued = monthRecords.mapNotNull { record ->
             metric.readFrom(record, heightCm)?.let { record to it }
         }
         if (valued.isEmpty()) return null
         val avg = valued.map { it.second }.average()
-        // 用该月最后一条记录的时间作为代表时间
+        // 用该月最后一条记录作为「代表记录」，供切换指标时保持身份一致
         val representative = valued.maxByOrNull { it.first.measuredAt }!!.first
-        return ChartPoint(representative.measuredAt, avg, representative.id)
+        return ChartPoint(monthMidpoint(month, zone), avg, representative.id)
     }
+
+    /** 某个月的中点（15 日中午），与年视图 X 轴刻度的取位保持一致 */
+    fun monthMidpoint(month: YearMonth, zone: ZoneId): Instant =
+        month.atDay(15).atTime(12, 0).atZone(zone).toInstant()
 }

@@ -54,6 +54,15 @@ private val SHORT_DATE_TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPatt
 fun Instant.formatDateTime(zone: ZoneId = ZoneId.systemDefault()): String =
     DATE_TIME_FORMAT.format(atZone(zone))
 
+/**
+ * 月聚合点的气泡时间：只到月。
+ *
+ * 月聚合点的横坐标是**月中**（见 Aggregator.monthlyPoint），不是真实测量时刻，
+ * 所以气泡里绝不能显示具体日期 —— 那会是编造的。
+ */
+fun Instant.formatYearMonth(zone: ZoneId = ZoneId.systemDefault()): String =
+    YEAR_MONTH_FORMAT.format(atZone(zone))
+
 /** 图表气泡里的紧凑日期时间，如 `6月30日 20:15` */
 fun Instant.formatShortDateTime(zone: ZoneId = ZoneId.systemDefault()): String =
     SHORT_DATE_TIME_FORMAT.format(atZone(zone))
@@ -72,6 +81,7 @@ fun Instant.formatRangeDate(zone: ZoneId = ZoneId.systemDefault()): String =
 private val MD_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("M月d日")
 private val YMD_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日")
 private val YM_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月")
+private val YEAR_MONTH_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月")
 private val MONTH_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("M月")
 
 /**
