@@ -111,38 +111,59 @@ class ChartScaffolderTest {
         }
     }
 
+    // ─────────────── 目标线：始终纳入 Y 轴 ───────────────
+
+    /**
+     * 产品要求目标线**必须在图上看得见**，所以不再有「离得太远就不撑开」的例外。
+     * 代价是目标离数据很远时折线会被压扁 —— 这是刻意用「看得见目标」换「看趋势」。
+     */
+    @Test
+    fun `目标线无条件纳入范围 - 哪怕离数据很远`() {
+        // 数据 67.7–68.8，目标 65.0：差 2.7，远超原先 30% 的阈值
+        val axis = ChartScaffolder.buildYAxis(listOf(67.7, 68.8), targetLine = 65.0)
+        assertTrue("下界 ${axis.lower} 没包住目标 65.0", axis.lower <= 65.0)
+        assertTrue(axis.upper >= 68.8)
+    }
+
+    @Test
+    fun `目标高于数据时同样纳入`() {
+        val axis = ChartScaffolder.buildYAxis(listOf(67.7, 68.8), targetLine = 75.0)
+        assertTrue("上界 ${axis.upper} 没包住目标 75.0", axis.upper >= 75.0)
+        assertTrue(axis.lower <= 67.7)
+    }
+
+    @Test
+    fun `目标在数据区间内时不影响`() {
+        val without = ChartScaffolder.buildYAxis(listOf(66.0, 72.0))
+        val with = ChartScaffolder.buildYAxis(listOf(66.0, 72.0), targetLine = 68.0)
+        assertEquals(without.lower, with.lower, 1e-9)
+        assertEquals(without.upper, with.upper, 1e-9)
+    }
+
+    @Test
+    fun `没有数据时目标也纳入`() {
+        val axis = ChartScaffolder.buildYAxis(emptyList(), targetLine = 60.0)
+        assertTrue(axis.upper > axis.lower)
+    }
+    // ─────────────── Y 轴：数据居中 ───────────────
+
+    // ─────────────── Y 轴：必须真的覆盖住数据 ───────────────
+
+    /**
+     * 这是修过的一个真 bug。
+     *
+     * 原先按「3M ≥ 跨度」挑步长，但下界向下取整会掉到 min 以下、吃掉 3M 的预算，
+     * 结果是 `lower + 3M < max` —— 折线顶部被裁到图外。
+     * 判据必须是「lower + 3M ≥ max」。
+     */
+
+
     // ─────────────── 目标线：30% 撑开限制（决策 B8）───────────────
 
-    @Test
-    fun `目标靠近数据时纳入范围`() {
-        // 数据 67.7-68.8（跨度 1.1），目标 67.0，差距 0.7 = 64% 跨度 → 超出 30%，不该纳入
-        assertTrue(ChartScaffolder.shouldIncludeTarget(listOf(67.7, 68.8), 67.6))
-        assertTrue(ChartScaffolder.shouldIncludeTarget(listOf(67.7, 68.8), 68.0))
-    }
 
-    @Test
-    fun `目标远离数据时不纳入 - 否则折线会被压成平线`() {
-        assertTrue(
-            "目标 65 与数据 67.7-68.8 差 2.7，远超 30%",
-            !ChartScaffolder.shouldIncludeTarget(listOf(67.7, 68.8), 65.0),
-        )
-        assertTrue(!ChartScaffolder.shouldIncludeTarget(listOf(67.7, 68.8), 70.5))
-    }
 
-    @Test
-    fun `目标在数据区间内时必然纳入`() {
-        assertTrue(ChartScaffolder.shouldIncludeTarget(listOf(66.0, 72.0), 68.0))
-    }
 
-    @Test
-    fun `数据跨度为零时目标无条件纳入`() {
-        assertTrue(ChartScaffolder.shouldIncludeTarget(listOf(68.0, 68.0), 60.0))
-    }
 
-    @Test
-    fun `没有数据时目标无条件纳入`() {
-        assertTrue(ChartScaffolder.shouldIncludeTarget(emptyList(), 60.0))
-    }
 
     // ─────────────── Y 轴：对齐设计文档的主/次步长对照表 ───────────────
 

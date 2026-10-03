@@ -318,15 +318,9 @@ private fun buildChart(
     val rawTarget = profile.targetWeightKg
         ?.takeIf { it > 0.0 && metric == Metric.WEIGHT }
 
-    // 决策 B8：目标离数据太远就不撑开 Y 轴，否则折线会被压成一条平线，趋势全看不出来
-    val includeTarget = rawTarget != null && ChartScaffolder.shouldIncludeTarget(values, rawTarget)
-    val goalLine = rawTarget?.takeIf { includeTarget }
-    val goalOffscreen = when {
-        rawTarget == null || includeTarget -> GoalOffscreen.NONE
-        values.isEmpty() -> GoalOffscreen.NONE
-        rawTarget < values.min() -> GoalOffscreen.BELOW
-        else -> GoalOffscreen.ABOVE
-    }
+    // 目标线**无条件纳入** Y 轴范围：产品要求它在图上必须看得见。
+    // 代价是目标离数据很远时折线会被压扁 —— 这是刻意用「看得见目标」换「看趋势」。
+    val goalLine = rawTarget
 
     return ChartUi(
         tab = tab,
@@ -337,7 +331,7 @@ private fun buildChart(
         yAxis = if (points.isEmpty()) null else ChartScaffolder.buildYAxis(values, goalLine),
         xLabels = ChartScaffolder.xLabels(tab, range, zone),
         goalLine = goalLine,
-        goalOffscreen = goalOffscreen,
+
         canShiftForward = RangeResolver.canShiftForward(tab, anchor, today, earliestDate, zone),
         canShiftBackward = RangeResolver.canShiftBackward(tab, anchor, earliestDate, zone),
     )

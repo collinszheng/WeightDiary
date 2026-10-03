@@ -1,5 +1,6 @@
 package com.weightdiary.app.ui.common
 
+import com.weightdiary.app.domain.chart.ChartTab
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -68,6 +69,48 @@ private const val WEEKDAY_CHARS = "一二三四五六日"
 fun Instant.formatRangeDate(zone: ZoneId = ZoneId.systemDefault()): String =
     RANGE_DATE_FORMAT.format(atZone(zone))
 
+private val MD_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("M月d日")
+private val YMD_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日")
+private val YM_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月")
+private val MONTH_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("M月")
+
+/**
+ * 折线图上方的区间文案。
+ *
+ * **本年度不显示年份** —— 年份只在跨年时才有信息量，常驻只会把真正要看的
+ * 「几月几号」挤小。各视图再各自精简：
+ * - 日：只写当天是哪一天，不写「几号到几号」（同一天没有区间可言）
+ * - 月：只写几月
+ * - 年：只写几年
+ */
+fun rangeLabel(
+    tab: ChartTab,
+    start: Instant,
+    end: Instant,
+    zone: ZoneId = ZoneId.systemDefault(),
+    today: LocalDate = LocalDate.now(zone),
+): String {
+    val s = start.atZone(zone)
+    val e = end.atZone(zone)
+    val thisYear = s.year == today.year
+
+    return when (tab) {
+        ChartTab.DAY -> if (thisYear) MD_FORMAT.format(s) else YMD_FORMAT.format(s)
+
+        ChartTab.WEEK ->
+            if (thisYear) "${MD_FORMAT.format(s)} - ${MD_FORMAT.format(e)}"
+            else "${YMD_FORMAT.format(s)} - ${YMD_FORMAT.format(e)}"
+
+        ChartTab.MONTH -> if (thisYear) MONTH_FORMAT.format(s) else YM_FORMAT.format(s)
+
+        ChartTab.YEAR -> "${s.year}年"
+
+        // 区间长度不固定，跨年时两个端点都补上年份
+        ChartTab.ALL ->
+            if (thisYear && s.year == e.year) "${MD_FORMAT.format(s)} - ${MD_FORMAT.format(e)}"
+            else "${YMD_FORMAT.format(s)} - ${YMD_FORMAT.format(e)}"
+    }
+}
 /**
  * 图表 X 轴标签。格式随标签的**语义类别**变，而不是随粒度变 ——
  * 周视图下所有标签都是星期几，年视图下都是月份。

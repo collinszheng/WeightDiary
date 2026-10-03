@@ -9,7 +9,7 @@ import kotlin.math.floor
 import kotlin.math.pow
 
 /**
- * Y 轴：4 条带数字的主刻度 + 若干条不带数字的次刻度（默认共 13 条）。
+ * Y 轴：4 条带数字的主刻度 + 若干条不带数字的次刻度。
  *
  * 见 [docs/03-技术设计.md §4.4]。
  */
@@ -24,7 +24,7 @@ data class YAxis(
 
     val minorStep: Double get() = majorStep / subdivisions
 
-    /** 全部刻度线（含主刻度），默认 13 条 */
+    /** 全部刻度线（含主刻度） */
     val allTicks: List<Double>
         get() {
             val total = 3 * subdivisions
@@ -57,7 +57,7 @@ object ChartScaffolder {
      * 构造 Y 轴。
      *
      * @param values   参与绘图的数据值
-     * @param targetLine 目标体重。是否纳入由调用方先用 [shouldIncludeTarget] 判断过
+     * @param targetLine 目标体重。**始终纳入范围** —— 产品要求目标线必须在图上看得见
      */
     fun buildYAxis(values: List<Double>, targetLine: Double? = null): YAxis {
         val extremes = buildList {
@@ -116,41 +116,6 @@ object ChartScaffolder {
      */
     private fun snapCentered(center: Double, step: Double): Double =
         Math.round((center - 1.5 * step) / step).toDouble() * step
-
-    /**
-     * 目标线要不要纳入 Y 轴范围（决策 B8）。
-     *
-     * 无条件纳入的话，目标离数据很远时 Y 轴会被撑得很开、折线压成一条平线，趋势完全看不出来。
-     * 所以只在与数据区间的距离不超过 [TARGET_STRETCH_LIMIT_RATIO] 时才纳入，
-     * 否则改为在图表边缘画一个方向箭头。
-     */
-    const val TARGET_STRETCH_LIMIT_RATIO = 0.30
-
-    fun shouldIncludeTarget(dataValues: List<Double>, target: Double): Boolean {
-        val finite = dataValues.filter { it.isFinite() }
-        if (finite.isEmpty() || !target.isFinite()) return true
-        val dataMin = finite.min()
-        val dataMax = finite.max()
-        val span = dataMax - dataMin
-        if (span < 1e-9) return true
-        val gap = when {
-            target < dataMin -> dataMin - target
-            target > dataMax -> target - dataMax
-            else -> 0.0
-        }
-        return gap <= span * TARGET_STRETCH_LIMIT_RATIO
-    }
-
-    /**
-     * 全部候选步长：`{1, 2, 3, 4, 5, 6, 8, 10} × 10^k`（k = 0..2），升序，全是整数。
-     *
-     * 不能先把量级归一到 10 的幂再乘 —— 那样跨度 12 时候选会从 5 起步，把 4 漏掉。
-     */
-    private fun candidateSteps(): List<Double> =
-        (0..2).flatMap { k ->
-            val scale = 10.0.pow(k)
-            NICE_INT_STEPS.map { it * scale }
-        }.distinct().sorted()
 
     /**
      * X 轴标签。**按视图分类**，不用统一的「5 个等分」——
@@ -217,6 +182,17 @@ object ChartScaffolder {
         val scaled = step * 10.0
         return abs(scaled - Math.round(scaled).toDouble()) < 1e-6
     }
+
+    /**
+     * 全部候选步长：`{1, 2, 3, 4, 5, 6, 8, 10} × 10^k`（k = 0..2），升序，全是整数。
+     *
+     * 不能先把量级归一到 10 的幂再乘 —— 那样跨度 12 时候选会从 5 起步，把 4 漏掉。
+     */
+    private fun candidateSteps(): List<Double> =
+        (0..2).flatMap { k ->
+            val scale = 10.0.pow(k)
+            NICE_INT_STEPS.map { it * scale }
+        }.distinct().sorted()
 
     /** 供测试用：把期望的上界向下取整到步长整数倍 */
     internal fun snapDown(value: Double, step: Double): Double = floor(value / step) * step

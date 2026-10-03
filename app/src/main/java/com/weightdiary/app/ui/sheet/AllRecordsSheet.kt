@@ -19,6 +19,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -54,6 +58,10 @@ fun AllRecordsSheet(
     val dimen = WeightDiaryTheme.dimens
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    // 展开状态由弹窗持有，而不是每行自己记 —— 同一时刻最多只有一行是展开的，
+    // 划开第二行时第一行会自动弹回
+    var revealedId by remember { mutableStateOf<Long?>(null) }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -85,8 +93,13 @@ fun AllRecordsSheet(
                 items(items = rows, key = { it.id }) { row ->
                     SwipeToDeleteRow(
                         row = row,
+                        revealedId = revealedId,
+                        onRevealChange = { revealedId = it },
                         onClick = { onRowClick(row) },
-                        onDelete = { onRowDelete(row) },
+                        onDelete = {
+                            revealedId = null
+                            onRowDelete(row)
+                        },
                     )
                     Box(
                         modifier = Modifier

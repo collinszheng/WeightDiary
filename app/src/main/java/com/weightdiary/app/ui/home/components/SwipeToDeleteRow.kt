@@ -15,11 +15,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,28 +33,30 @@ import com.weightdiary.app.ui.theme.WeightDiaryTheme
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** 划开后停住的位置：行宽的三分之一（产品要求「划到三分之一处」） */
+/** 划开后停住的位置：行宽的三分之一 */
 private const val REVEAL_FRACTION = 1f / 3f
 
 /** 甩动速度超过这个值就直接判定方向，不看位置 */
 private const val FLING_VELOCITY = 900f
 
+/** 收起 / 展开的动画时长 */
+private const val SETTLE_MS = 180
+
 /**
  * 左滑**露出**删除按钮的记录行。
  *
- * 交互与 `SwipeToDismissBox` 有本质区别：**滑动本身不删除**。
- * 行只会滑到三分之一处停住、露出按钮，必须再点一下那个按钮才真的删。
+ * 交互要点：**滑动本身不删除**。行只会滑到三分之一处停住、露出按钮，
+ * 必须再点一下那个按钮才真的删。因此全 App 不再需要「已删除」的撤销 Snackbar ——
+ * 二次确认本身就承担了防误删。
  *
- * 这样做的代价是少了一次「划一下就删掉」的爽快，换来的是：
- * - 误划不会丢数据（滑到底也只是露出按钮）
- * - 删除动作有明确的落点，不依赖阈值判断
- *
- * 因此全 App 不再需要「已删除」的撤销 Snackbar —— 二次确认本身就承担了防误删。
- * 长按入口已取消：它没有任何视觉提示，与左滑功能重叠，且取消撤销后误触不可恢复。
+ * **展开状态由调用方持有**（[revealedId]），不是每行自己记：
+ * 这样同一时刻最多只有一行是展开的 —— 划开第二行时第一行会自动弹回。
  */
 @Composable
 fun SwipeToDeleteRow(
     row: RecordRow,
+    revealedId: Long?,
+    onRevealChange: (Long?) -> Unit,
     onClick: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -71,15 +71,15 @@ fun SwipeToDeleteRow(
         val rowWidth = maxWidth
         val revealWidth = rowWidth * REVEAL_FRACTION
         val revealPx = with(density) { rowWidth.toPx() } * REVEAL_FRACTION
+
         // 0 = 收起；-revealPx = 完全展开
         val offset = remember { Animatable(0f) }
-        // 单独用一个布尔量而不是每帧读 offset.value：拖动时逐帧读会让整行重组
-        var revealed by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
+        val isRevealed = revealedId == row.id
 
-        fun settle(reveal: Boolean) {
-            revealed = reveal
-            scope.launch { offset.animateTo(if (reveal) -revealPx else 0f, tween(180)) }
+        // 展开状态一变就滑到对应位置：自己被划开时滑出，别的行被划开时自动弹回
+        LaunchedEffect(isRevealed, revealPx) {
+            offset.animateTo(if (isRevealed) -revealPx else 0f, tween(SETTLE_MS))
         }
 
         Box {
@@ -93,7 +93,7 @@ fun SwipeToDeleteRow(
                         .fillMaxHeight()
                         .width(revealWidth)
                         .background(colors.bmiObese)
-                        .clickable(enabled = revealed, role = Role.Button, onClick = onDelete),
+                        .clickable(enabled = isRevealed, role = Role.Button, onClick = onDelete),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -108,7 +108,7 @@ fun SwipeToDeleteRow(
             RecordRowItem(
                 row = row,
                 // 划开状态下点行本身 = 收起，而不是进编辑
-                onClick = { if (revealed) settle(false) else onClick() },
+                onClick = { if (isRevealed) onRevealChange(null) else onClick() },
                 modifier = Modifier
                     // 顺序要紧：offset 必须在 background **之前**。
                     // 反过来的话白色底会画在 offset 外面、留在原位，把下面的红底整个盖住，
@@ -124,13 +124,12 @@ fun SwipeToDeleteRow(
                             }
                         },
                         onDragStopped = { velocity ->
-                            settle(
-                                when {
-                                    velocity < -FLING_VELOCITY -> true
-                                    velocity > FLING_VELOCITY -> false
-                                    else -> offset.value < -revealPx / 2f
-                                },
-                            )
+                            val reveal = when {
+                                velocity < -FLING_VELOCITY -> true
+                                velocity > FLING_VELOCITY -> false
+                                else -> offset.value < -revealPx / 2f
+                            }
+                            onRevealChange(if (reveal) row.id else null)
                         },
                     ),
             )

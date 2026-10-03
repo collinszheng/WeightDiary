@@ -39,9 +39,9 @@ import com.weightdiary.app.R
 import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.ui.common.format1
-import com.weightdiary.app.ui.common.formatRangeDate
 import com.weightdiary.app.ui.common.formatShortDateTime
 import com.weightdiary.app.ui.common.formatXLabel
+import com.weightdiary.app.ui.common.rangeLabel
 import com.weightdiary.app.ui.home.ChartUi
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 import kotlin.math.roundToInt
@@ -84,8 +84,9 @@ fun ChartCard(
         val start = chart.start
         val end = chart.end
         DateRangePicker(
+            // 区间文案按视图精简：本年度不带年份，日只写当天、月只写几月、年只写几年
             text = if (start != null && end != null) {
-                stringResource(R.string.range_separator, start.formatRangeDate(), end.formatRangeDate())
+                rangeLabel(chart.tab, start, end)
             } else {
                 ""
             },

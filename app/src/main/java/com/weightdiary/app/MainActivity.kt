@@ -106,7 +106,6 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             onChartTabSelected = viewModel::selectTab,
             onShiftRange = viewModel::shiftRange,
             onRecordClick = { viewModel.startEdit(it) },
-            onRecordDelete = viewModel::deleteRecord,
             onViewAllRecords = { viewModel.openSheet(ActiveSheet.ALL_RECORDS) },
         )
 

@@ -85,20 +85,13 @@ data class ChartUi(
     val xLabels: XAxisLabels = XAxisLabels(emptyList(), XLabelKind.DATE),
     /** 画虚线的目标值。已确认纳入 Y 轴范围才会非空 */
     val goalLine: Double? = null,
-    /** 目标被判定为「离数据太远、不撑开 Y 轴」时，在图表边缘画方向箭头（决策 B8） */
-    val goalOffscreen: GoalOffscreen = GoalOffscreen.NONE,
+
     val canShiftForward: Boolean = false,
     val canShiftBackward: Boolean = false,
 ) {
     val hasData: Boolean get() = points.isNotEmpty()
 }
 
-/** 目标线跑到轴外时，箭头指向哪边 */
-enum class GoalOffscreen {
-    NONE,
-    BELOW,
-    ABOVE,
-}
 
 data class GoalUi(
     /** 最新体重，作为目标卡片的"当前体重" */

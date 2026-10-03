@@ -1,6 +1,7 @@
 package com.weightdiary.app.ui.home.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -42,6 +44,16 @@ fun RecordRowItem(
     row: RecordRow,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * 主动消费横向拖动。
+     *
+     * 首页历史区没有横向滚动容器（左滑删除已移除），横滑不会被任何东西消费，
+     * 于是 `clickable` 会把「横滑」误判成「点击」并打开编辑弹窗。
+     * 消费掉横向拖动，点击判定就会失效。
+     *
+     * 「全部记录」弹窗里不能开这个 —— 那里的外层 `draggable` 要靠这个手势来露出删除按钮。
+     */
+    swallowHorizontalDrag: Boolean = false,
 ) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
@@ -56,6 +68,15 @@ fun RecordRowItem(
             // heightIn 而不是 height：字体放大后行内容要能撑开（设计规范 §8）
             .heightIn(min = ROW_HEIGHT)
             .clickable(role = Role.Button, onClick = onClick)
+            .then(
+                if (swallowHorizontalDrag) {
+                    Modifier.pointerInput(Unit) {
+                        detectHorizontalDragGestures { change, _ -> change.consume() }
+                    }
+                } else {
+                    Modifier
+                }
+            )
             .semantics { contentDescription = description }
             .padding(horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,

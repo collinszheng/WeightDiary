@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,7 +34,6 @@ fun HistorySection(
     totalCount: Int,
     hasMore: Boolean,
     onRowClick: (RecordRow) -> Unit,
-    onRowDelete: (RecordRow) -> Unit,
     onViewMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -73,15 +71,13 @@ fun HistorySection(
                         .background(colors.divider),
                 )
             }
-            // 必须按 id 分组：否则行的滑动状态会跟着**位置**走 ——
-            // 删掉第一行后，下一行会顶到同一个槽位、继承「已展开」的状态，看着像自己划开了
-            key(row.id) {
-                SwipeToDeleteRow(
-                    row = row,
-                    onClick = { onRowClick(row) },
-                    onDelete = { onRowDelete(row) },
-                )
-            }
+            // 首页历史区**不做左滑删除** —— 这一块是高频浏览区，
+            // 左滑太容易误触。删除只在「全部记录」弹窗里提供。
+            RecordRowItem(
+                row = row,
+                onClick = { onRowClick(row) },
+                swallowHorizontalDrag = true,
+            )
         }
 
         if (hasMore) {

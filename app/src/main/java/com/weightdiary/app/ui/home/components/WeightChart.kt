@@ -38,7 +38,6 @@ import com.weightdiary.app.domain.chart.ChartPoint
 import com.weightdiary.app.domain.chart.MonotoneCubic
 import com.weightdiary.app.domain.chart.XLabelKind
 import com.weightdiary.app.ui.home.ChartUi
-import com.weightdiary.app.ui.home.GoalOffscreen
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 import java.time.Instant
 import kotlin.math.abs
@@ -239,10 +238,6 @@ fun WeightChart(
                 }
             }
 
-            // 目标离数据太远、不撑开 Y 轴时，用边缘的方向箭头代替虚线（决策 B8）
-            if (chart.goalOffscreen != GoalOffscreen.NONE) {
-                drawGoalArrow(colors.accent, chart.goalOffscreen, plotLeft, plotTop, plotBottom)
-            }
 
             // ── 7. X 轴标签 ──
             // 位置由按 Tab 分类的规则给出：周 = 七个星期几、年 = 十二个月、月 = 1/10/20/月末。
@@ -307,25 +302,7 @@ fun WeightChart(
     }
 }
 
-private fun DrawScope.drawGoalArrow(
-    color: Color,
-    direction: GoalOffscreen,
-    plotLeft: Float,
-    plotTop: Float,
-    plotBottom: Float,
-) {
-    val pointsUp = direction == GoalOffscreen.ABOVE
-    val centerX = plotLeft + 10.dp.toPx()
-    val centerY = if (pointsUp) plotTop + 8.dp.toPx() else plotBottom - 8.dp.toPx()
-    val half = 5.dp.toPx()
-    val tipY = if (pointsUp) centerY - half else centerY + half
-    val baseY = if (pointsUp) centerY + half else centerY - half
-    val back = if (pointsUp) half * 0.7f else -half * 0.7f
 
-    drawLine(color, Offset(centerX, baseY), Offset(centerX, tipY), 1.5.dp.toPx(), StrokeCap.Round)
-    drawLine(color, Offset(centerX - half * 0.7f, tipY + back), Offset(centerX, tipY), 1.5.dp.toPx(), StrokeCap.Round)
-    drawLine(color, Offset(centerX + half * 0.7f, tipY + back), Offset(centerX, tipY), 1.5.dp.toPx(), StrokeCap.Round)
-}
 
 /** 深色圆角气泡，默认浮在数据点上方；贴到上边界时翻到下方 */
 private fun DrawScope.drawTooltip(
