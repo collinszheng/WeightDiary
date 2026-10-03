@@ -39,4 +39,4 @@ minSdk          26
 compileSdk      36
 ```
 
-> ⚠️ **构建必须走代理**：本机 Java 直连 `services.gradle.org` 会超时，走 `127.0.0.1:7897` 才通。Android Studio 同步失败时先查 `Settings → HTTP Proxy`。详见 [03 技术设计 · 风险 R2](03-技术设计.md#r2-构建必须走代理)。
+> ⚠️ **首次构建可能卡在依赖下载**：Gradle 要从 `services.gradle.org` 与 Maven 仓库拉依赖，网络受限时会超时。配好代理或镜像源即可，详见 [03 技术设计 · 风险 R2](03-技术设计.md)。

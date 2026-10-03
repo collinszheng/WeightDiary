@@ -25,21 +25,40 @@ param(
 $ErrorActionPreference = 'Continue'
 
 $repo  = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$sdk   = 'C:\Users\usr\AppData\Local\Android\Sdk'
-$jbr   = 'E:\Android\Android Studio\jbr'
+
+# SDK 一律自动探测，**不写死本机路径** ——
+# 写死会让脚本换台机器就跑不起来，也会把本机用户名带进版本库。
+# 优先级：环境变量 → local.properties 的 sdk.dir → 常见默认位置
+function Resolve-AndroidSdk {
+    foreach ($p in @($env:ANDROID_SDK_ROOT, $env:ANDROID_HOME)) {
+        if ($p -and (Test-Path $p)) { return $p }
+    }
+    $lp = Join-Path $repo 'local.properties'
+    if (Test-Path $lp) {
+        $line = Select-String -Path $lp -Pattern '^\s*sdk\.dir\s*=\s*(.+?)\s*$' | Select-Object -First 1
+        if ($line) {
+            $dir = $line.Matches[0].Groups[1].Value -replace '\\\\', '\'
+            if (Test-Path $dir) { return $dir }
+        }
+    }
+    $guess = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
+    if (Test-Path $guess) { return $guess }
+    throw '找不到 Android SDK：请设置 ANDROID_SDK_ROOT，或在 local.properties 里写 sdk.dir'
+}
+
+$sdk   = Resolve-AndroidSdk
 $adb   = Join-Path $sdk 'platform-tools\adb.exe'
 $emu   = Join-Path $sdk 'emulator\emulator.exe'
-$avd   = 'Medium_Phone_API_37.0'
+$avd   = if ($env:AVD_NAME) { $env:AVD_NAME } else { 'Medium_Phone_API_37.0' }
 $pkg   = 'com.weightdiary.app'
-$proxy = '-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7897 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7897'
 $shotDir = Join-Path $repo 'build\screenshots'
 $shotPath = Join-Path $shotDir $Out
 
-$env:JAVA_HOME = $jbr
+# 代理是可选的：需要时先设 $env:GRADLE_PROXY，能直连 Gradle 仓库的环境不用设
 $env:ANDROID_HOME = $sdk
 $env:ANDROID_SDK_ROOT = $sdk
-$env:GRADLE_OPTS = $proxy
-$env:Path = "$sdk\platform-tools;$sdk\emulator;$jbr\bin;$env:Path"
+if ($env:GRADLE_PROXY) { $env:GRADLE_OPTS = $env:GRADLE_PROXY }
+$env:Path = "$sdk\platform-tools;$sdk\emulator;$env:Path"
 
 function Get-Device {
     $lines = & $adb devices 2>$null
@@ -50,7 +69,7 @@ function Get-Device {
 if (-not $SkipBuild) {
     Write-Host '── 构建 ──'
     Push-Location $repo
-    & cmd.exe /c "gradlew.bat assembleDebug --no-daemon --console=plain $proxy" 2>&1 |
+    & cmd.exe /c "gradlew.bat assembleDebug --no-daemon --console=plain $env:GRADLE_PROXY" 2>&1 |
         Select-String -Pattern 'BUILD |^e: |FAILURE' | Select-Object -First 20
     $code = $LASTEXITCODE
     Pop-Location

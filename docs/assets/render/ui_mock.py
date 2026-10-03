@@ -2,6 +2,7 @@
 """体重日记 — 首页高保真稿，严格按 docs/weight-tracker-design.md 的定稿规格渲染。"""
 from PIL import Image, ImageDraw, ImageFont, ImageChops
 import math
+import os
 
 S = 3                      # px per dp
 SCREEN_W = 411   # 与测试设备一致：1080px / 420dpi = 411.4dp
@@ -285,5 +286,5 @@ for val, dl, when in items:
 rrect(16, STATUS_H + 870, SCREEN_W - 16, STATUS_H + 914, 12, fill=DIV)
 txt(SCREEN_W / 2, STATUS_H + 884, "查看更多记录", 15, PRI, bold=True, anchor="ma")
 
-img.convert("RGB").save(r"E:\adev\WeightDiary\docs\assets\home.png", quality=95)
+img.convert("RGB").save(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'home.png'), quality=95)
 print("saved", img.size)

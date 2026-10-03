@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """体重日记 — 底部弹窗与空状态高保真稿。"""
 from PIL import Image, ImageDraw, ImageFont
+import os
 
 S = 2
 SW, SH = 411, 852   # 与测试设备一致：1080px / 420dpi
@@ -237,5 +238,5 @@ for p, cap in panels:
     out.alpha_composite(p, (P(x), P(LABEL_H)))
     x += SW + GAP
 
-out.convert("RGB").save(r"E:\adev\WeightDiary\docs\assets\sheets.png", quality=95)
+out.convert("RGB").save(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'sheets.png'), quality=95)
 print("saved", out.size)

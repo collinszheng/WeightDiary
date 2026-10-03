@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Render tick-density variants of the weight chart using the locked design tokens."""
 from PIL import Image, ImageDraw, ImageFont, ImageChops
+import os
 
 W, PANEL_H = 1320, 470
 PLOT_L, PLOT_R = 86, 1240
@@ -139,5 +140,5 @@ for im in imgs:
     out.alpha_composite(im, (0, y))
     y += PANEL_H + GAP
 
-out.convert("RGB").save(r"E:\adev\WeightDiary\docs\assets\chart-ticks.png", quality=95)
+out.convert("RGB").save(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'chart-ticks.png'), quality=95)
 print("saved", out.size)

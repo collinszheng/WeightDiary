@@ -86,16 +86,16 @@ pwsh -File tools/verify-m2.ps1
 ## 构建
 
 ```bash
-# 本机 Java 直连 services.gradle.org 会超时，必须走代理
-export GRADLE_OPTS="-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7897 \
-                    -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7897"
-
 ./gradlew assembleDebug          # 构建
 ./gradlew testDebugUnitTest      # 单测（123 个）
 ./gradlew distRelease            # 出正式签名包 → dist/WeightDiary-<版本>.apk
 ```
 
-Android Studio 若同步失败，检查 `Settings → HTTP Proxy`。详见 [03 技术设计 · R2](docs/03-技术设计.md)。
+需要 **JDK 17+** 与 **Android SDK（compileSdk 36）**。`local.properties` 里的 `sdk.dir`
+指向你的 SDK 位置，该文件**不在版本库里**，各人自己配。
+
+若首次构建长时间卡在依赖下载，通常是网络问题：在 `~/.gradle/gradle.properties` 里配好代理，
+或在 Android Studio 的 `Settings → HTTP Proxy` 里设置。详见 [03 技术设计 · R2](docs/03-技术设计.md)。
 
 ### 关于正式包
 
@@ -152,7 +152,11 @@ app/src/test/   123 个单测（BMI 12 · 图表 51 · 记录行 7 · 校验 13 
 - **数据一律以公制存储**，单位切换只是显示层的事
 - **颜色、字号、间距不写死**，全部走 `ui/theme/` 的 token
 
-## 本机环境注记
+## 项目是手工搭建的
 
-- **构建必须走代理**：Java 直连 `services.gradle.org` 超时，走 `127.0.0.1:7897` 才通
-- **`android` CLI 的 `create` 子命令在本机不可用**：它会卡在自己的 `.sdk/lock` 上报错，即使放宽权限也一样；本项目是手工搭建的。遇到同类报错别再折腾权限，直接绕开或用 Android Studio
+没有用 `android create` 或 Android Studio 向导生成 —— 向导产出的目录结构与本项目的约定
+（`domain/` 不依赖 Android、`ui/theme/` 集中 token、`docs/` 与代码同仓）不一致，改造的成本
+比从头写更高。模块划分、依赖版本、`build.gradle.kts` 都是手写的。
+
+代价是：**新增依赖时要自己查版本兼容**（AGP / Kotlin / KSP / Compose BOM 四者的版本矩阵），
+升级时也一样。升级前先跑 `./gradlew testDebugUnitTest`。
