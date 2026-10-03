@@ -103,6 +103,7 @@
     <!-- 设置 -->
     <string name="sheet_settings_title">设置</string>
     <string name="action_cancel">取消</string>
+<string name="action_back">返回</string>
 
     <string name="settings_section_bmi">BMI 标准</string>
     <string name="bmi_standard_china">中国标准</string>

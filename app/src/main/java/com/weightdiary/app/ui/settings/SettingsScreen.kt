@@ -1,4 +1,4 @@
-package com.weightdiary.app.ui.sheet
+package com.weightdiary.app.ui.settings
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -9,20 +9,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,37 +39,39 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.model.BmiStandard
-import com.weightdiary.app.ui.sheet.components.SheetTitle
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
 /**
- * 设置弹窗。
+ * 设置。**整屏**，不是底部弹窗。
+ *
+ * 入口按钮在右上角，再用从下往上弹的弹窗就不呼应了 ——
+ * 和「添加数据」那个悬浮按钮是同一个道理。
  *
  * 三块：BMI 标准、数据管理、关于。
- *
  * 数据管理走 SAF（系统文件选择器）而不是自己写文件：不需要存储权限，
  * 用户自己决定存到哪，也不会有「App 偷偷写了什么」的疑虑。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsSheet(
+fun SettingsScreen(
     bmiStandard: BmiStandard,
     recordCount: Int,
     versionName: String,
+    onBack: () -> Unit,
     onBmiStandardChange: (BmiStandard) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onClearData: () -> Unit,
-    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
     val dimen = WeightDiaryTheme.dimens
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var confirmingClear by remember { mutableStateOf(false) }
 
@@ -91,103 +96,154 @@ fun SettingsSheet(
         )
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = colors.background,
-        shape = RoundedCornerShape(topStart = dimen.radiusSheetTop, topEnd = dimen.radiusSheetTop),
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.background)
+            // 背景铺满含状态栏区域，只把内容下移避开
+            .windowInsetsPadding(WindowInsets.statusBars),
     ) {
-        Column(
+        // ─────────── 顶栏：返回 + 居中标题 ───────────
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.75f)
+                .height(dimen.topBarHeight),
+        ) {
+            Text(
+                text = stringResource(R.string.sheet_settings_title),
+                style = typo.screenTitle,
+                color = colors.textPrimary,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            BackArrowButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    // 让 20dp 的视觉箭头落在距左边缘 16dp 处
+                    .padding(start = dimen.pageHorizontal - (dimen.minTouchTarget - 20.dp) / 2),
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = dimen.pageHorizontal),
         ) {
-            SheetTitle(stringResource(R.string.sheet_settings_title))
+            Spacer(Modifier.height(4.dp))
 
-            Spacer(Modifier.height(12.dp))
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                // ─────────── BMI 标准 ───────────
-                SectionLabel(stringResource(R.string.settings_section_bmi))
-                SettingsGroup {
-                    Column(modifier = Modifier.padding(dimen.cardPadding)) {
-                        BmiStandardSelector(
-                            selected = bmiStandard,
-                            onSelect = onBmiStandardChange,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(R.string.settings_bmi_hint),
-                            style = typo.cardLabel,
-                            color = colors.textSecondary,
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(dimen.sectionGap))
-
-                // ─────────── 数据管理 ───────────
-                SectionLabel(stringResource(R.string.settings_section_data))
-                SettingsGroup {
-                    SettingsRow(
-                        title = stringResource(R.string.settings_export),
-                        description = stringResource(R.string.settings_export_desc),
-                        onClick = onExport,
-                    )
-                    GroupDivider()
-                    SettingsRow(
-                        title = stringResource(R.string.settings_import),
-                        description = stringResource(R.string.settings_import_desc),
-                        onClick = onImport,
-                    )
-                    GroupDivider()
-                    SettingsRow(
-                        title = stringResource(R.string.settings_clear),
-                        description = stringResource(R.string.settings_clear_desc),
-                        onClick = { confirmingClear = true },
-                        danger = true,
+            // ─────────── BMI 标准 ───────────
+            SectionLabel(stringResource(R.string.settings_section_bmi))
+            SettingsGroup {
+                Column(modifier = Modifier.padding(dimen.cardPadding)) {
+                    BmiStandardSelector(selected = bmiStandard, onSelect = onBmiStandardChange)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.settings_bmi_hint),
+                        style = typo.cardLabel,
+                        color = colors.textSecondary,
                     )
                 }
-
-                Spacer(Modifier.height(dimen.sectionGap))
-
-                // ─────────── 关于 ───────────
-                SectionLabel(stringResource(R.string.settings_section_about))
-                SettingsGroup {
-                    Column(modifier = Modifier.padding(dimen.cardPadding)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.app_name),
-                                style = typo.body,
-                                color = colors.textPrimary,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Spacer(Modifier.weight(1f))
-                            Text(
-                                text = stringResource(R.string.about_version, versionName),
-                                style = typo.cardLabel,
-                                color = colors.textSecondary,
-                            )
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = stringResource(R.string.about_privacy),
-                            style = typo.cardLabel,
-                            color = colors.textSecondary,
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(dimen.sectionGap))
             }
+
+            Spacer(Modifier.height(dimen.sectionGap))
+
+            // ─────────── 数据管理 ───────────
+            SectionLabel(stringResource(R.string.settings_section_data))
+            SettingsGroup {
+                SettingsRow(
+                    title = stringResource(R.string.settings_export),
+                    description = stringResource(R.string.settings_export_desc),
+                    onClick = onExport,
+                )
+                GroupDivider()
+                SettingsRow(
+                    title = stringResource(R.string.settings_import),
+                    description = stringResource(R.string.settings_import_desc),
+                    onClick = onImport,
+                )
+                GroupDivider()
+                SettingsRow(
+                    title = stringResource(R.string.settings_clear),
+                    description = stringResource(R.string.settings_clear_desc),
+                    onClick = { confirmingClear = true },
+                    danger = true,
+                )
+            }
+
+            Spacer(Modifier.height(dimen.sectionGap))
+
+            // ─────────── 关于 ───────────
+            SectionLabel(stringResource(R.string.settings_section_about))
+            SettingsGroup {
+                Column(modifier = Modifier.padding(dimen.cardPadding)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.app_name),
+                            style = typo.body,
+                            color = colors.textPrimary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            text = stringResource(R.string.about_version, versionName),
+                            style = typo.cardLabel,
+                            color = colors.textSecondary,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(R.string.about_privacy),
+                        style = typo.cardLabel,
+                        color = colors.textSecondary,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(dimen.sectionGap))
+        }
+
+        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+    }
+}
+
+/** 顶栏左侧的返回箭头 */
+@Composable
+private fun BackArrowButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = WeightDiaryTheme.colors
+    val dimen = WeightDiaryTheme.dimens
+    val description = stringResource(R.string.action_back)
+
+    Box(
+        modifier = modifier
+            .size(dimen.minTouchTarget)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(20.dp)) {
+            val stroke = 1.8.dp.toPx()
+            val midY = size.height * 0.5f
+            val tipX = size.width * 0.28f
+            val backX = size.width * 0.78f
+
+            drawLine(
+                color = colors.textPrimary,
+                start = Offset(backX, size.height * 0.16f),
+                end = Offset(tipX, midY),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = colors.textPrimary,
+                start = Offset(tipX, midY),
+                end = Offset(backX, size.height * 0.84f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
         }
     }
 }

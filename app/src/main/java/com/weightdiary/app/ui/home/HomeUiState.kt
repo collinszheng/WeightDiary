@@ -18,7 +18,6 @@ enum class ActiveSheet {
     ADD_RECORD,
     EDIT_PROFILE,
     ALL_RECORDS,
-    SETTINGS,
 }
 
 /**
@@ -64,11 +63,20 @@ data class HomeUiState(
 
     /** 「超重」的门槛由它决定：中国 24.0 / WHO 25.0 */
     val bmiStandard: BmiStandard = BmiStandard.CHINA,
+
+    /** 当前整屏。设置是**整屏**而不是弹窗 —— 入口在右上角，从下往上弹不呼应 */
+    val screen: Screen = Screen.HOME,
 ) {
     /** 首页历史区默认展示条数（设计规范 §4.5：默认展示最近 2–3 条） */
     val historyLimit: Int get() = HOME_HISTORY_LIMIT
 
     val hasMoreRecords: Boolean get() = allRecords.size > history.size
+}
+
+/** 整屏页面。弹窗仍由 [ActiveSheet] 表达 */
+enum class Screen {
+    HOME,
+    SETTINGS,
 }
 
 const val HOME_HISTORY_LIMIT = 3

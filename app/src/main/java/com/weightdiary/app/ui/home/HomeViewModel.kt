@@ -45,6 +45,9 @@ class HomeViewModel(
     /** 正在编辑的记录 id。非空时「添加数据」弹窗进入编辑模式。 */
     private val editingId = MutableStateFlow<Long?>(null)
 
+    /** 整屏导航。设置是整屏，不是弹窗 */
+    private val screen = MutableStateFlow(Screen.HOME)
+
 
 
     /** 一次性事件用 Channel 而不是 StateFlow：Snackbar 这类事件不该在旋转屏幕后被重放。 */
@@ -60,6 +63,7 @@ class HomeViewModel(
     private data class UiLocal(
         val sheet: ActiveSheet,
         val editingId: Long?,
+        val screen: Screen,
     )
 
     private val dataSnapshot = combine(
@@ -68,7 +72,7 @@ class HomeViewModel(
         ::DataSnapshot,
     )
 
-    private val uiLocal = combine(activeSheet, editingId, ::UiLocal)
+    private val uiLocal = combine(activeSheet, editingId, screen, ::UiLocal)
 
     val uiState: StateFlow<HomeUiState> = combine(
         dataSnapshot,
@@ -77,7 +81,7 @@ class HomeViewModel(
         chartAnchor,
         uiLocal,
     ) { data, metric, tab, anchor, local ->
-        buildState(data.records, data.profile, metric, local.sheet, local.editingId, tab, anchor)
+        buildState(data.records, data.profile, metric, local.sheet, local.editingId, local.screen, tab, anchor)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -197,6 +201,15 @@ class HomeViewModel(
 
     // ─────────────── 设置 ───────────────
 
+    fun openSettings() {
+        activeSheet.value = ActiveSheet.NONE
+        screen.value = Screen.SETTINGS
+    }
+
+    fun closeSettings() {
+        screen.value = Screen.HOME
+    }
+
     fun setBmiStandard(standard: BmiStandard) {
         viewModelScope.launch { repository.setBmiStandard(standard) }
     }
@@ -292,6 +305,7 @@ private fun buildState(
     metric: Metric,
     sheet: ActiveSheet,
     editingId: Long?,
+    screen: Screen,
     tab: ChartTab,
     anchor: LocalDate,
     zone: ZoneId = ZoneId.systemDefault(),
@@ -338,6 +352,7 @@ private fun buildState(
         activeSheet = sheet,
         showOnboarding = !profile.onboardingCompleted,
         bmiStandard = profile.bmiStandard,
+        screen = screen,
         chart = buildChart(records, profile, metric, tab, anchor, earliestDate, height, zone, today),
         history = rows.take(HOME_HISTORY_LIMIT),
         allRecords = rows,

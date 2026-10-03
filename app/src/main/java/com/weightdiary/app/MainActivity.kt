@@ -4,7 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -31,12 +36,13 @@ import com.weightdiary.app.ui.home.HomeScreen
 import com.weightdiary.app.ui.home.HomeUiState
 import com.weightdiary.app.domain.record.RecordCsv
 import com.weightdiary.app.ui.home.HomeViewModel
+import com.weightdiary.app.ui.home.Screen
 import com.weightdiary.app.ui.home.components.AddRecordFab
 import com.weightdiary.app.ui.sheet.AddRecordSheet
 import com.weightdiary.app.ui.sheet.AllRecordsSheet
 import com.weightdiary.app.ui.sheet.EditProfileSheet
+import com.weightdiary.app.ui.settings.SettingsScreen
 import com.weightdiary.app.ui.sheet.OnboardingSheet
-import com.weightdiary.app.ui.sheet.SettingsSheet
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -144,6 +150,9 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
         }
     }
 
+    // 设置页按系统返回键应当回到首页，而不是退出 App
+    BackHandler(enabled = state.screen == Screen.SETTINGS) { viewModel.closeSettings() }
+
     // 用 Scaffold 承载悬浮按钮与 Snackbar：它会自动把按钮抬到 Snackbar 之上，
     // 手写 Box 的话两者会在底部叠在一起
     Scaffold(
@@ -158,6 +167,8 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             }
         },
         floatingActionButton = {
+            // 悬浮按钮是首页的「添加数据」，设置页不该有
+            if (state.screen != Screen.HOME) return@Scaffold
             AddRecordFab(
                 onClick = { viewModel.openSheet(ActiveSheet.ADD_RECORD) },
                 // contentWindowInsets 置零之后 Scaffold 不会自己避让导航栏，
@@ -166,16 +177,42 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             )
         },
     ) {
-        HomeScreen(
-            state = state,
-            onMetricClick = viewModel::selectMetric,
-            onEditProfile = { viewModel.openSheet(ActiveSheet.EDIT_PROFILE) },
-            onChartTabSelected = viewModel::selectTab,
-            onShiftRange = viewModel::shiftRange,
-            onRecordClick = { viewModel.startEdit(it) },
-            onViewAllRecords = { viewModel.openSheet(ActiveSheet.ALL_RECORDS) },
-            onSettingsClick = { viewModel.openSheet(ActiveSheet.SETTINGS) },
-        )
+        // 整屏之间左右滑动，而不是直接替换 —— 有个方向感才知道自己进/退到了哪
+        AnimatedContent(
+            targetState = state.screen,
+            transitionSpec = {
+                if (targetState == Screen.SETTINGS) {
+                    slideInHorizontally { it } togetherWith slideOutHorizontally { -it / 4 }
+                } else {
+                    slideInHorizontally { -it / 4 } togetherWith slideOutHorizontally { it }
+                }
+            },
+            label = "screen",
+        ) { screen ->
+            when (screen) {
+                Screen.HOME -> HomeScreen(
+                    state = state,
+                    onMetricClick = viewModel::selectMetric,
+                    onEditProfile = { viewModel.openSheet(ActiveSheet.EDIT_PROFILE) },
+                    onChartTabSelected = viewModel::selectTab,
+                    onShiftRange = viewModel::shiftRange,
+                    onRecordClick = { viewModel.startEdit(it) },
+                    onViewAllRecords = { viewModel.openSheet(ActiveSheet.ALL_RECORDS) },
+                    onSettingsClick = viewModel::openSettings,
+                )
+
+                Screen.SETTINGS -> SettingsScreen(
+                    bmiStandard = state.bmiStandard,
+                    recordCount = state.recordCount,
+                    versionName = BuildConfig.VERSION_NAME,
+                    onBack = viewModel::closeSettings,
+                    onBmiStandardChange = viewModel::setBmiStandard,
+                    onExport = { exportLauncher.launch(defaultBackupFileName()) },
+                    onImport = { importLauncher.launch(arrayOf("*/*")) },
+                    onClearData = viewModel::clearAllData,
+                )
+            }
+        }
     }
 
     when (state.activeSheet) {
@@ -219,16 +256,6 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             onEditCancel = viewModel::cancelEdit,
         )
 
-        ActiveSheet.SETTINGS -> SettingsSheet(
-            bmiStandard = state.bmiStandard,
-            recordCount = state.recordCount,
-            versionName = BuildConfig.VERSION_NAME,
-            onBmiStandardChange = viewModel::setBmiStandard,
-            onExport = { exportLauncher.launch(defaultBackupFileName()) },
-            onImport = { importLauncher.launch(arrayOf("*/*")) },
-            onClearData = viewModel::clearAllData,
-            onDismiss = viewModel::dismissSheet,
-        )
 
         ActiveSheet.EDIT_PROFILE -> EditProfileSheet(
             initialHeightCm = state.heightCm,
