@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.validation.RecordValidator
@@ -65,6 +67,8 @@ fun AddRecordSheet(
     onDismiss: () -> Unit,
     onSubmit: (weightKg: Double, measuredAt: Instant, bodyFatPercent: Double?, note: String?) -> Unit,
     initial: RecordRow? = null,
+    /** 非空时在保存按钮下方显示「删除」。长按和左滑都没有视觉提示，这里是唯一看得见的删除入口 */
+    onDelete: (() -> Unit)? = null,
 ) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
@@ -200,8 +204,26 @@ fun AddRecordSheet(
                         }
                     }
                 },
-                modifier = Modifier.padding(vertical = 16.dp),
+                modifier = Modifier.padding(top = 16.dp),
             )
+
+            if (onDelete != null) {
+                TextButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.action_delete),
+                        style = typo.body,
+                        color = colors.bmiObese,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            } else {
+                Spacer(Modifier.height(16.dp))
+            }
         }
     }
 }

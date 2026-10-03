@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.record.RecordRow
 import com.weightdiary.app.ui.home.components.RecordRowItem
+import com.weightdiary.app.ui.home.components.SwipeToDeleteRow
 import com.weightdiary.app.ui.sheet.components.SheetTitle
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
@@ -82,10 +83,11 @@ fun AllRecordsSheet(
 
             LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 items(items = rows, key = { it.id }) { row ->
-                    RecordRowItem(
+                    SwipeToDeleteRow(
                         row = row,
                         onClick = { onRowClick(row) },
                         onLongClick = { onRowLongClick(row) },
+                        onDelete = { onRowLongClick(row) },
                     )
                     Box(
                         modifier = Modifier

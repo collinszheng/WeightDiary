@@ -192,6 +192,8 @@ class HomeViewModel(private val repository: WeightRepository) : ViewModel() {
             // 先把整条记录取出来，撤销时才能原样写回（含原 id）
             val record = repository.findById(row.id) ?: return@launch
             repository.delete(row.id)
+            // 从编辑弹窗里删的，删完要把弹窗关掉；从列表里删的则留在列表继续删
+            if (activeSheet.value == ActiveSheet.ADD_RECORD) closeSheet()
             _events.send(HomeEvent.RecordDeleted(record))
         }
     }

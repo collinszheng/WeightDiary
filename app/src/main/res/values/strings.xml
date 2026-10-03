@@ -24,6 +24,7 @@
     <string name="action_add_record">添加数据</string>
     <string name="action_edit_profile">编辑个人资料</string>
     <string name="action_save">保存</string>
+    <string name="action_delete">删除</string>
     <string name="action_skip">跳过</string>
     <string name="action_undo">撤销</string>
 

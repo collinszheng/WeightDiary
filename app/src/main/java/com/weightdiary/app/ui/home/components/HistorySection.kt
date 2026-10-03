@@ -72,10 +72,11 @@ fun HistorySection(
                         .background(colors.divider),
                 )
             }
-            RecordRowItem(
+            SwipeToDeleteRow(
                 row = row,
                 onClick = { onRowClick(row) },
                 onLongClick = { onRowLongClick(row) },
+                onDelete = { onRowLongClick(row) },
             )
         }
 

@@ -134,25 +134,29 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
     }
 
     when (state.activeSheet) {
-        ActiveSheet.ADD_RECORD -> AddRecordSheet(
-            // 非空即进入编辑模式：预填原值、标题变「编辑数据」
-            initial = state.editing,
-            onDismiss = viewModel::dismissSheet,
-            onSubmit = { weightKg, measuredAt, bodyFatPercent, note ->
-                val editing = state.editing
-                if (editing != null) {
-                    viewModel.updateRecord(
-                        id = editing.id,
-                        weightKg = weightKg,
-                        measuredAt = measuredAt,
-                        bodyFatPercent = bodyFatPercent,
-                        note = note,
-                    )
-                } else {
-                    viewModel.addRecord(weightKg, measuredAt, bodyFatPercent, note)
-                }
-            },
-        )
+        ActiveSheet.ADD_RECORD -> {
+            val editing = state.editing
+            AddRecordSheet(
+                // 非空即进入编辑模式：预填原值、标题变「编辑数据」
+                initial = editing,
+                // 编辑时在保存下方给出显式的删除入口 —— 长按与左滑都没有视觉提示
+                onDelete = editing?.let { row -> { viewModel.deleteRecord(row) } },
+                onDismiss = viewModel::dismissSheet,
+                onSubmit = { weightKg, measuredAt, bodyFatPercent, note ->
+                    if (editing != null) {
+                        viewModel.updateRecord(
+                            id = editing.id,
+                            weightKg = weightKg,
+                            measuredAt = measuredAt,
+                            bodyFatPercent = bodyFatPercent,
+                            note = note,
+                        )
+                    } else {
+                        viewModel.addRecord(weightKg, measuredAt, bodyFatPercent, note)
+                    }
+                },
+            )
+        }
 
         ActiveSheet.ALL_RECORDS -> AllRecordsSheet(
             rows = state.allRecords,
