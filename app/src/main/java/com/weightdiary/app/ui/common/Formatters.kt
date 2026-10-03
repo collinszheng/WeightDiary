@@ -45,10 +45,15 @@ fun Instant.toTimeLabel(zone: ZoneId = ZoneId.systemDefault()): TimeLabel {
 }
 
 private val DATE_TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日  HH:mm")
+private val SHORT_DATE_TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("M月d日 HH:mm")
 
 /** 编辑弹窗里显示的完整日期时间，如 `2026年6月30日  20:15` */
 fun Instant.formatDateTime(zone: ZoneId = ZoneId.systemDefault()): String =
     DATE_TIME_FORMAT.format(atZone(zone))
+
+/** 图表气泡里的紧凑日期时间，如 `6月30日 20:15` */
+fun Instant.formatShortDateTime(zone: ZoneId = ZoneId.systemDefault()): String =
+    SHORT_DATE_TIME_FORMAT.format(atZone(zone))
 
 private val RANGE_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日")
 private val X_LABEL_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")

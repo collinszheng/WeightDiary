@@ -36,6 +36,7 @@ import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.ui.common.format1
 import com.weightdiary.app.ui.common.formatRangeDate
+import com.weightdiary.app.ui.common.formatShortDateTime
 import com.weightdiary.app.ui.common.formatXLabel
 import com.weightdiary.app.ui.home.ChartUi
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
@@ -90,12 +91,22 @@ fun ChartCard(
         Spacer(Modifier.height(12.dp))
 
         if (chart.hasData) {
+            val unit = when (metric) {
+                Metric.WEIGHT -> stringResource(R.string.unit_kg)
+                Metric.BODY_FAT -> stringResource(R.string.unit_percent)
+                Metric.BMI -> ""
+            }
             WeightChart(
                 chart = chart,
                 yAxisTitle = stringResource(metric.axisTitleRes()),
                 // 主步长只从整数里选，所以四个刻度必然都是整数（设计规范 §4.4）
                 formatY = { value -> value.roundToInt().toString() },
                 formatX = { it.formatXLabel(chart.granularity) },
+                formatTooltip = { point ->
+                    val value = point.value.format1()
+                    val withUnit = if (unit.isEmpty()) value else "$value $unit"
+                    "$withUnit · ${point.time.formatShortDateTime()}"
+                },
                 goalLabel = chart.goalLine?.let { stringResource(R.string.goal_line, it.format1()) },
                 modifier = Modifier
                     .fillMaxWidth()

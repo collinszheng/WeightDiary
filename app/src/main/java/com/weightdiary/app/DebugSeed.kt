@@ -61,17 +61,18 @@ object DebugSeed {
             bodyFatPercent = 21.6,
             note = "seed",
         )
-        // 再往前铺 30 天的趋势数据，并与前三条接得上（否则图上会出现一个假的暴跌）。
-        // 中间故意留两处缺口，用来验证「跨空缺仍是实线」。
+        // 再往前铺 110 天的趋势数据，并与前三条接得上（否则图上会出现一个假的暴跌）。
+        // 铺到 110 天是有意的：超过 120 天「总」视图就会切到按月聚合，反而没几个单位、滚不动了。
+        // 中间故意留几处缺口，用来验证「跨空缺仍是实线」。
         val noise = listOf(0.0, -0.18, 0.12, -0.25, 0.2, 0.0, -0.1, 0.28)
-        val gapDays = setOf(9L, 10L, 22L)
+        val gapDays = setOf(9L, 10L, 22L, 47L, 48L, 49L, 73L, 90L, 91L)
         var index = 0
-        for (day in 3L..30L) {
+        for (day in 3L..110L) {
             if (day !in gapDays) {
                 repository.add(
-                    weightKg = 68.0 + (day - 2) * 0.13 + noise[index % noise.size],
+                    weightKg = 68.0 + (day - 2) * 0.035 + noise[index % noise.size],
                     measuredAt = now.minus(day, ChronoUnit.DAYS),
-                    bodyFatPercent = (22.0 - day * 0.04).coerceAtLeast(15.0),
+                    bodyFatPercent = (22.0 - day * 0.02).coerceAtLeast(15.0),
                     note = "seed",
                 )
             }
