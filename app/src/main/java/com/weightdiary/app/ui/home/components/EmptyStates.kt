@@ -119,24 +119,11 @@ fun HomeSkeleton(modifier: Modifier = Modifier) {
     ) {
         Spacer(Modifier.height(dimen.topBarHeight))
 
-        // 概览卡片行
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = dimen.pageHorizontal),
-            horizontalArrangement = Arrangement.spacedBy(dimen.cardGap),
-        ) {
-            repeat(3) {
-                Bone(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(dimen.metricCardHeight),
-                )
-            }
-        }
+        // 与 HomeScreen 一致：顶栏与目标卡之间隔 8dp
+        Spacer(Modifier.height(8.dp))
 
-        Spacer(Modifier.height(dimen.cardGap))
-
+        // 目标与水平卡片。填过体脂时实际会更高，但骨架屏只存在一两帧，
+        // 按无体脂的最小高度画即可，不值得为它去查一次数据。
         Bone(
             modifier = Modifier
                 .fillMaxWidth()

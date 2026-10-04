@@ -17,14 +17,9 @@ data class WeightDiaryDimens(
     val cardGap: Dp = 12.dp,
     val cardPadding: Dp = 16.dp,
     val sectionGap: Dp = 20.dp,
-    val metricCardGap: Dp = 10.dp,
 
     // ── 尺寸 ──
     val topBarHeight: Dp = 56.dp,
-    /** 112dp 而不是设计稿暗示的 120dp：393dp 宽的屏幕上 120dp 会把第 3 张卡裁掉 */
-    val metricCardWidth: Dp = 112.dp,
-    /** 96dp → 84dp：体重卡不再显示变化量与时间，压扁一点更紧凑 */
-    val metricCardHeight: Dp = 84.dp,
     val goalCardHeight: Dp = 110.dp,
     val chartCardHeight: Dp = 356.dp,
     val chartPlotHeight: Dp = 220.dp,
