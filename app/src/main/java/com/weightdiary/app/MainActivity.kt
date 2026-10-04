@@ -192,7 +192,6 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
             when (screen) {
                 Screen.HOME -> HomeScreen(
                     state = state,
-                    onMetricClick = viewModel::selectMetric,
                     onEditProfile = { viewModel.openSheet(ActiveSheet.EDIT_PROFILE) },
                     onChartTabSelected = viewModel::selectTab,
                     onShiftRange = viewModel::shiftRange,

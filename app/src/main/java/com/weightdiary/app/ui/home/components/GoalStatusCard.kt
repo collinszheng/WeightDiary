@@ -143,6 +143,19 @@ fun GoalStatusCard(
             } else {
                 Spacer(Modifier.height(3.dp))
             }
+
+            // 最近一次**填写过的**体脂，不是最近一条记录的 —— 体脂测量频率低，
+            // 跟着最新记录走的话，只要最新那条没填这一行就消失了。
+            // 没填过就整行不出现，卡片高度随之自适应。
+            state.latestBodyFatPercent?.let { fat ->
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.goal_body_fat, fat.format1()),
+                    style = typo.axis.tabular,
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                )
+            }
         }
 
         Spacer(Modifier.width(12.dp))

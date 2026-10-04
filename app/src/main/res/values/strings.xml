@@ -63,13 +63,23 @@
     <string name="tab_year">年</string>
     <string name="tab_all">总</string>
     <string name="axis_weight">体重 (公斤)</string>
-    <string name="axis_bmi">BMI</string>
-    <string name="axis_body_fat">体脂率 (%)</string>
     <string name="goal_line">目标 %1$s</string>
+    <!-- 目标卡上的最近一次体脂。没填过就不显示 -->
+    <string name="goal_body_fat">体脂 %1$s%%</string>
+    <!-- 图表上的水平参照线：BMI 分级阈值换算成体重后的位置，如「超重 73.4」 -->
+    <string name="reference_line">%1$s %2$s</string>
+    <!-- 目标线落在坐标轴窗口外时的角标。▼ 表示目标在下方、还需要减 -->
+    <string name="goal_offscreen_below">目标 %1$s ▼ 还差 %2$s kg</string>
+    <!-- ▲ 表示目标在上方、还需要增 -->
+    <string name="goal_offscreen_above">目标 %1$s ▲ 还需 %2$s kg</string>
     <string name="chart_empty">这段时间还没有记录</string>
     <string name="range_separator">%1$s - %2$s</string>
     <string name="action_prev_range">上一个时间段</string>
     <string name="action_next_range">下一个时间段</string>
+    <!-- 历史记录行里跟在体重后面的体脂，如「· 21.8%」。填了才显示 -->
+    <string name="body_fat_inline">· %1$s%%</string>
+    <!-- 读屏用：体重 + 体脂 + 时间。Row 上的 contentDescription 会盖掉子元素文字，所以必须带上 -->
+    <string name="cd_record_row_with_fat">%1$s 公斤，体脂 %2$s%%，%3$s</string>
     <string name="axis_end_of_day">24:00</string>
 
     <!-- 历史记录 -->

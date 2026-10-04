@@ -11,8 +11,8 @@ import com.weightdiary.app.domain.chart.Aggregator
 import com.weightdiary.app.domain.chart.ChartScaffolder
 import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.chart.RangeResolver
+import com.weightdiary.app.domain.chart.ReferenceLines
 import com.weightdiary.app.domain.model.BmiStandard
-import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.model.UserProfile
 import com.weightdiary.app.domain.model.WeightRecord
 import com.weightdiary.app.domain.record.RecordRow
@@ -35,7 +35,6 @@ class HomeViewModel(
     private val backup: RecordBackup,
 ) : ViewModel() {
 
-    private val selectedMetric = MutableStateFlow(Metric.WEIGHT)
     private val activeSheet = MutableStateFlow(ActiveSheet.NONE)
     private val chartTab = MutableStateFlow(ChartTab.WEEK)
 
@@ -76,28 +75,16 @@ class HomeViewModel(
 
     val uiState: StateFlow<HomeUiState> = combine(
         dataSnapshot,
-        selectedMetric,
         chartTab,
         chartAnchor,
         uiLocal,
-    ) { data, metric, tab, anchor, local ->
-        buildState(data.records, data.profile, metric, local.sheet, local.editingId, local.screen, tab, anchor)
+    ) { data, tab, anchor, local ->
+        buildState(data.records, data.profile, local.sheet, local.editingId, local.screen, tab, anchor)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HomeUiState(),
     )
-
-    fun selectMetric(metric: Metric) {
-        val snapshot = uiState.value
-        // 「有体重，无身高」时 BMI 根本算不出来。这时点 BMI 卡应当去补身高，
-        // 而不是切到一个永远空着的图表（设计规范 §6）。一条记录都没有时不拦，切过去也无妨。
-        if (metric == Metric.BMI && snapshot.heightCm == null && !snapshot.isEmpty) {
-            openSheet(ActiveSheet.EDIT_PROFILE)
-            return
-        }
-        selectedMetric.value = metric
-    }
 
     // ─────────────── 图表 ───────────────
 
@@ -302,7 +289,6 @@ class HomeViewModel(
 private fun buildState(
     records: List<WeightRecord>,
     profile: UserProfile,
-    metric: Metric,
     sheet: ActiveSheet,
     editingId: Long?,
     screen: Screen,
@@ -327,14 +313,16 @@ private fun buildState(
     // 换来的是列表与图表天然同步 —— 不用维护第二份状态，也就不会不同步。
     val rows = RecordRows.build(records)
 
+    // 体脂单独找「最近一次填写的」。记录已按 measuredAt 倒序，所以 firstOrNull 就是最近那次
+    val latestBodyFat = records.firstOrNull { it.bodyFatPercent != null }?.bodyFatPercent
+
     return HomeUiState(
         isLoading = false,
         isEmpty = records.isEmpty(),
         recordCount = records.size,
-        selectedMetric = metric,
         weightKg = latest?.weightKg,
         bmi = bmi,
-        bodyFatPercent = latest?.bodyFatPercent,
+        latestBodyFatPercent = latestBodyFat,
         heightCm = height,
         latestMeasuredAt = latest?.measuredAt,
         deltaKg = if (latest != null && previous != null) {
@@ -353,7 +341,7 @@ private fun buildState(
         showOnboarding = !profile.onboardingCompleted,
         bmiStandard = profile.bmiStandard,
         screen = screen,
-        chart = buildChart(records, profile, metric, tab, anchor, earliestDate, height, zone, today),
+        chart = buildChart(records, profile, tab, anchor, earliestDate, height, zone, today),
         history = rows.take(HOME_HISTORY_LIMIT),
         allRecords = rows,
         editing = editingId?.let { id -> rows.firstOrNull { it.id == id } },
@@ -363,7 +351,6 @@ private fun buildState(
 private fun buildChart(
     records: List<WeightRecord>,
     profile: UserProfile,
-    metric: Metric,
     tab: ChartTab,
     anchor: LocalDate,
     earliestDate: LocalDate?,
@@ -373,29 +360,47 @@ private fun buildChart(
 ): ChartUi {
     val range = RangeResolver.resolve(tab, anchor, earliestDate, zone)
     val granularity = RangeResolver.granularityOf(tab, range)
-    val points = Aggregator.aggregate(records, range, granularity, metric, heightCm, zone)
+    val points = Aggregator.aggregate(records, range, granularity, zone)
     val values = points.map { it.value }
 
-    // 目标线只对体重有意义 —— BMI / 体脂率没有「目标值」这个概念
-    val rawTarget = profile.targetWeightKg
-        ?.takeIf { it > 0.0 && metric == Metric.WEIGHT }
-
-    // 目标线**无条件纳入** Y 轴范围：产品要求它在图上必须看得见。
-    // 代价是目标离数据很远时折线会被压扁 —— 这是刻意用「看得见目标」换「看趋势」。
-    val goalLine = rawTarget
-
-    return ChartUi(
+    val base = ChartUi(
         tab = tab,
         granularity = granularity,
         start = range.start,
         end = range.end,
         points = points,
-        yAxis = if (points.isEmpty()) null else ChartScaffolder.buildYAxis(values, goalLine),
         xLabels = ChartScaffolder.xLabels(tab, range, zone),
-        goalLine = goalLine,
-
         canShiftForward = RangeResolver.canShiftForward(tab, anchor, today, earliestDate, zone),
         canShiftBackward = RangeResolver.canShiftBackward(tab, anchor, earliestDate, zone),
+    )
+
+    if (points.isEmpty()) return base
+
+    val target = profile.targetWeightKg?.takeIf { it > 0.0 }
+
+    // ── 目标线：只在「纳入它不会把主步长顶大」时才画进坐标轴 ──
+    //
+    // 窗口宽度永远是 3 × 主步长。目标离数据远时，纳入它会让步长从 1 跳到 3，
+    // 窗口从 3 个单位涨到 9 个，折线振幅从 47% 掉到 16%。所以判据不是
+    // 「目标在不在射程内」，而是「纳入它要不要付代价」——步长不变就是免费。
+    val stepWithoutTarget = ChartScaffolder.buildYAxis(values).majorStep
+    val targetFits = target != null &&
+        ChartScaffolder.buildYAxis(values, target).majorStep == stepWithoutTarget
+
+    val axis = ChartScaffolder.buildYAxis(values, if (targetFits) target else null)
+
+    return base.copy(
+        yAxis = axis,
+        goalLine = target?.takeIf { targetFits },
+        goalOffscreen = target?.takeIf { !targetFits }?.let {
+            GoalOffscreen(
+                targetKg = it,
+                // 拿最后一个绘图点比，而不是最新那条记录 —— 图上看到的是前者
+                gapKg = points.last().value - it,
+                below = it < axis.lower,
+            )
+        },
+        referenceLines = ReferenceLines.visibleIn(axis, heightCm, profile.bmiStandard),
     )
 }
 

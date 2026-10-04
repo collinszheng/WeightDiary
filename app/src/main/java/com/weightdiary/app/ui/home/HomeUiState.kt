@@ -3,12 +3,12 @@ package com.weightdiary.app.ui.home
 import com.weightdiary.app.domain.chart.ChartPoint
 import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.chart.Granularity
+import com.weightdiary.app.domain.chart.ReferenceLine
 import com.weightdiary.app.domain.chart.XAxisLabels
 import com.weightdiary.app.domain.chart.XLabelKind
 import com.weightdiary.app.domain.chart.YAxis
 import com.weightdiary.app.domain.model.BmiLevel
 import com.weightdiary.app.domain.model.BmiStandard
-import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.record.RecordRow
 import java.time.Instant
 
@@ -32,13 +32,17 @@ data class HomeUiState(
     val isEmpty: Boolean = true,
     val recordCount: Int = 0,
 
-    /** 当前选中的图表指标 */
-    val selectedMetric: Metric = Metric.WEIGHT,
-
-    // ── 概览卡片的值（都是"最新一条"。与图表的"当日最低值"有意不同，见决策记录 冲突 2）──
+    // ── 目标卡要用的值（「最新一条」，与图表的「当日最低值」有意不同，见决策记录 冲突 2）──
     val weightKg: Double? = null,
     val bmi: Double? = null,
-    val bodyFatPercent: Double? = null,
+
+    /**
+     * **最近一次填写的**体脂率，不是最近一条记录的那条。
+     *
+     * 体脂的测量频率远低于体重（可能几周才填一次）。跟着最新记录走的话，
+     * 只要最新那条没填体脂，这个位置就空了 —— 而用户明明上个月填过。
+     */
+    val latestBodyFatPercent: Double? = null,
     val heightCm: Double? = null,
     val latestMeasuredAt: Instant? = null,
     /** 与上一条记录的差值。正数为增、负数为减；只有一条记录时为 null */
@@ -96,14 +100,36 @@ data class ChartUi(
     val yAxis: YAxis? = null,
     /** X 轴标签。位置与语义类别都由按 Tab 分类的规则给出，不是统一的「5 个等分」 */
     val xLabels: XAxisLabels = XAxisLabels(emptyList(), XLabelKind.DATE),
-    /** 画虚线的目标值。已确认纳入 Y 轴范围才会非空 */
+
+    /** 目标线落在窗口内时画虚线；落在窗口外时为 null，改由 [goalOffscreen] 提示 */
     val goalLine: Double? = null,
+
+    /** 目标体重落在窗口外时的角标提示 */
+    val goalOffscreen: GoalOffscreen? = null,
+
+    /** BMI 分级阈值线。**只含落进当前窗口的那些**，视野外的一律不画 */
+    val referenceLines: List<ReferenceLine> = emptyList(),
 
     val canShiftForward: Boolean = false,
     val canShiftBackward: Boolean = false,
 ) {
     val hasData: Boolean get() = points.isNotEmpty()
 }
+
+/**
+ * 目标体重落在 Y 轴窗口外时的提示。
+ *
+ * **刻意不把目标硬塞进坐标轴**。窗口宽度永远是 `3 × 主步长`，把一个远在 6kg 外的目标
+ * 塞进来，步长会从 1 被顶到 3，窗口从 3 个单位涨到 9 个 —— 折线振幅从 47% 掉到 16%。
+ * 换成一个角标，信息反而更全（直接告诉你还差多少）。
+ */
+data class GoalOffscreen(
+    val targetKg: Double,
+    /** 最新一个绘图点与目标的差距。正数表示还要减，负数表示还要增 */
+    val gapKg: Double,
+    /** 目标在窗口**下方**（true）还是上方。决定角标贴下沿还是上沿 */
+    val below: Boolean,
+)
 
 
 data class GoalUi(

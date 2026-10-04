@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,13 +59,37 @@ private const val DOT_RADIUS_SPACING_RATIO = 0.22f
 private val HIT_RADIUS = 24.dp
 
 /**
+ * 图表上的一条水平参照线：BMI 分级阈值或目标体重。
+ *
+ * 文案与颜色由调用方（Composable 层）组装好 —— Canvas 的绘制作用域里调不了
+ * `stringResource`，所以不能把 `ReferenceLine` 直接传进来现组装。
+ */
+@Immutable
+data class ChartMarker(
+    val value: Double,
+    val label: String,
+    val color: Color,
+)
+
+/**
+ * 目标体重落在 Y 轴窗口外时的角标。
+ *
+ * [below] 决定贴在绘图区的下沿还是上沿 —— 角标要待在离目标近的那一侧。
+ */
+@Immutable
+data class GoalOffscreenUi(
+    val text: String,
+    val below: Boolean,
+)
+
+/**
  * 折线图。自绘 Canvas（决策 Q3）。
  *
  * **整段范围一次画完，图表区不响应横向手势。** 早先做过「内容超出视口就横向滚动」，
  * 但月/年/总三个视图的数据都会被塞进一屏，滚动既难发现、又和页面纵向滚动打架，
  * 收益不抵复杂度，已移除。切换时间段只走左右的箭头。
  *
- * 绘制层级自下而上：次刻度 → 主刻度 + 数字 → 渐变填充 → 目标虚线 → 折线 → 空心实测点 → X 轴标签 → 气泡。
+ * 绘制层级自下而上：次刻度 → 主刻度 + 数字 → 渐变填充 → 水平参照线 → 折线 → 空心实测点 → X 轴标签 → 气泡。
  */
 @Composable
 fun WeightChart(
@@ -75,14 +100,16 @@ fun WeightChart(
     formatTooltip: (ChartPoint) -> String,
     /** 「日」视图最后一个标签显示成 `24:00`，而不是 `23:59` */
     endOfDayLabel: String,
-    goalLabel: String?,
+    /** 水平参照线：BMI 阈值线与目标线。**只有落进当前窗口的才会出现在这里** */
+    markers: List<ChartMarker>,
+    /** 目标线落在窗口外时的角标 */
+    goalOffscreen: GoalOffscreenUi?,
     modifier: Modifier = Modifier,
 ) {
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
     val axisStyle = typo.axis.copy(color = colors.textSecondary)
     val titleStyle = typo.axis.copy(color = colors.textSecondary)
-    val goalStyle = typo.axisLabel.copy(color = colors.accent)
     val tooltipStyle = typo.axis.copy(color = Color.White)
     val textMeasurer = rememberTextMeasurer()
 
@@ -194,10 +221,13 @@ fun WeightChart(
                     )
                 }
 
-                chart.goalLine?.let { target ->
-                    val y = yOf(target)
+                // 水平参照线（BMI 分级阈值 + 目标线），画在折线**下面** ——
+                // 虚线压在数据上会抢注意力
+                markers.forEach { marker ->
+                    val y = yOf(marker.value)
+                    if (y <= plotTop || y >= plotBottom) return@forEach
                     drawLine(
-                        color = colors.accent,
+                        color = marker.color,
                         start = Offset(plotLeft, y),
                         end = Offset(plotRight, y),
                         strokeWidth = 1.5.dp.toPx(),
@@ -234,18 +264,70 @@ fun WeightChart(
                 }
             }
 
-            chart.goalLine?.let { target ->
-                goalLabel?.let {
-                    val y = yOf(target)
-                    if (y > plotTop && y < plotBottom) {
-                        drawText(
-                            textMeasurer = textMeasurer,
-                            text = it,
-                            style = goalStyle,
-                            topLeft = Offset(plotLeft + 4.dp.toPx(), y - 15.dp.toPx()),
-                        )
+            // ── 6b. 参照线标签 ──
+            // 目标线可能刚好落在某个 BMI 临界值附近，两个标签会叠在一起。
+            // 按 y 排序后从上往下依次下压，保证互不遮蔽。
+            run {
+                val minGap = 15.dp.toPx()
+                val onScreen = markers
+                    .mapNotNull { marker ->
+                        val y = yOf(marker.value)
+                        if (y <= plotTop || y >= plotBottom) null else y to marker
                     }
+                    .sortedBy { it.first }
+
+                var lastY = Float.NEGATIVE_INFINITY
+                onScreen.forEach { (rawY, marker) ->
+                    val y = if (rawY - lastY < minGap) lastY + minGap else rawY
+                    lastY = y
+                    drawText(
+                        textMeasurer = textMeasurer,
+                        text = marker.label,
+                        style = typo.axisLabel.copy(color = marker.color),
+                        topLeft = Offset(plotLeft + 4.dp.toPx(), y - 15.dp.toPx()),
+                    )
                 }
+            }
+
+            // ── 6c. 目标角标 ──
+            // 目标落在窗口外时不硬塞进坐标轴（那会把折线压平），改在离它近的那一侧给个角标。
+            // **画在绘图区内部** —— 贴在外面会压住 X 轴刻度。
+            goalOffscreen?.let { off ->
+                val text = textMeasurer.measure(off.text, axisStyle.copy(color = colors.accent))
+                val padH = 9.dp.toPx()
+                val padV = 4.dp.toPx()
+                val chipW = text.size.width + padH * 2
+                val chipH = text.size.height + padV * 2
+
+                // 优先待在目标那一侧；那一侧被数据占满了就翻到另一侧
+                val needed = chipH + 8.dp.toPx()
+                val dataTop = ys.min().toFloat()
+                val dataBottom = ys.max().toFloat()
+                val placeBelow = if (off.below) {
+                    plotBottom - dataBottom >= needed
+                } else {
+                    dataTop - plotTop < needed
+                }
+
+                val left = plotRight - chipW - 6.dp.toPx()
+                val top = if (placeBelow) {
+                    plotBottom - chipH - 5.dp.toPx()
+                } else {
+                    plotTop + 5.dp.toPx()
+                }
+
+                drawRoundRect(
+                    color = colors.accent.copy(alpha = 0.12f),
+                    topLeft = Offset(left, top),
+                    size = Size(chipW, chipH),
+                    cornerRadius = CornerRadius(6.dp.toPx()),
+                )
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = off.text,
+                    style = axisStyle.copy(color = colors.accent),
+                    topLeft = Offset(left + padH, top + padV),
+                )
             }
 
 

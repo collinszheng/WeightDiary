@@ -1,9 +1,11 @@
 package com.weightdiary.app.ui.common
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.model.Level
+import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
 /**
  * BMI 等级的显示文案。
@@ -20,3 +22,17 @@ fun Level.label(): String = stringResource(
         Level.OBESE -> R.string.level_obese
     }
 )
+
+/**
+ * BMI 等级对应的主题色。与目标卡的四色条、图表阈值线共用同一套 token，
+ * 免得同一个「超重」在三个地方是三种红。
+ */
+@Composable
+fun Level.color(): Color = with(WeightDiaryTheme.colors) {
+    when (this@color) {
+        Level.UNDERWEIGHT -> bmiUnderweight
+        Level.NORMAL -> bmiNormal
+        Level.OVERWEIGHT -> bmiOverweight
+        Level.OBESE -> bmiObese
+    }
+}

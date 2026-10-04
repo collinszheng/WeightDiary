@@ -32,7 +32,7 @@
 
 ```bash
 ./gradlew assembleDebug        # 构建
-./gradlew testDebugUnitTest    # 单测（123 个）
+./gradlew testDebugUnitTest    # 单测（130 个）
 ./gradlew distRelease          # 出正式签名包 → dist/WeightDiary-<版本>.apk
 ```
 

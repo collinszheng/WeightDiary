@@ -1,7 +1,7 @@
 # 体重日记 — 项目文档
 
 > **App 名称**：体重日记 ｜ **包名**：`com.weightdiary.app` ｜ **最低版本**：Android 8.0（minSdk 26）
-> **状态**：功能已实现，单测 123 个全绿
+> **状态**：功能已实现，单测 130 个全绿
 
 ---
 
@@ -26,7 +26,7 @@
 
 | 稿 | 文件 | 说明 |
 |---|---|---|
-| 首页 | [`assets/home.png`](assets/home.png) | 完整首页：概览卡片 / 目标与水平 / 图表 / 历史列表 |
+| 首页 | [`assets/home.png`](assets/home.png) | 完整首页：目标与水平卡片 / 图表 / 历史列表 |
 | 弹窗与空状态 | [`assets/sheets.png`](assets/sheets.png) | 添加数据弹窗、全部记录弹窗、首次使用空状态 |
 | 图表刻度对比 | [`assets/chart-ticks.png`](assets/chart-ticks.png) | 4 / 7 / 13 条刻度线的取舍过程 |
 | 折线平滑对比 | [`assets/chart-smooth.png`](assets/chart-smooth.png) | 直线段 / 全程平滑 / 分段平滑的取舍过程 |

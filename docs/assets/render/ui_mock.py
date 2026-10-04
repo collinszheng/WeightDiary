@@ -7,7 +7,7 @@ import os
 S = 3                      # px per dp
 SCREEN_W = 411   # 与测试设备一致：1080px / 420dpi = 411.4dp
 STATUS_H = 23      # 真机状态栏高度（1080x2400 @420dpi 上是 63px）
-TOTAL_H = 961
+TOTAL_H = 867
 
 WHITE = (255, 255, 255)
 CARD = (250, 250, 250)
@@ -76,28 +76,10 @@ d.ellipse([P(cx - rr), P(cy - rr), P(cx + rr), P(cy + rr)], outline=PRI, width=i
 d.line([P(cx - 6), P(cy), P(cx + 6), P(cy)], fill=PRI, width=int(round(1.5 * S)))
 d.line([P(cx), P(cy - 6), P(cx), P(cy + 6)], fill=PRI, width=int(round(1.5 * S)))
 
-# ══════════════════════ 概览卡片行 ══════════════════════
-mt, mh, mw, gap = STATUS_H + 64, 96, 112, 10
-cards = [
-    ("体重（公斤）", "68.5", True, "↓ 0.3", "今天 20:15"),
-    ("BMI", "22.4", False, None, None),
-    ("体脂率（%）", "21.8", False, None, None),
-    ("身高（厘米）", "175", False, None, None),
-]
-for i, (label, val, sel, delta, when) in enumerate(cards):
-    x = 16 + i * (mw + gap)
-    if x > SCREEN_W:
-        break
-    rrect(x, mt, x + mw, mt + mh, 20, fill=SEL_FILL if sel else CARD,
-          outline=PRI if sel else BORDER, width=1.5 if sel else 0.5)
-    txt(x + 14, mt + 12, label, 12, SEC)
-    txt(x + 14, mt + 30, val, 28, PRI, bold=True)
-    if delta:
-        txt(x + 14, mt + 66, delta, 13, ACCENT)
-        txt(x + mw - 12, mt + 68, when, 10, DIS, anchor="ra")
-
 # ══════════════════════ 目标与水平卡片 ══════════════════════
-gt, gh = STATUS_H + 172, 110
+# 2026-10：原先在它上面还有「概览卡片行」（三张卡切换图表指标），整组已删。
+# 图表现在只画体重，BMI 预警以阈值线的形式直接叠加进图表。
+gt, gh = STATUS_H + 64, 124
 rrect(16, gt, SCREEN_W - 16, gt + gh, 20, fill=CARD, outline=BORDER, width=0.5)
 txt(32, gt + 14, "当前 / 目标体重 (公斤)", 12, SEC)
 txt(32, gt + 36, "68.5", 28, PRI, bold=True)
@@ -111,6 +93,8 @@ d.polygon([(P(ex - 7), P(ey + 7)), (P(ex - 2.5), P(ey + 6.2)), (P(ex - 6.2), P(e
 pb_y = gt + 93      # 距卡片底 14dp，与 Compose 侧的 padding 对齐
 rrect(32, pb_y, 32 + 180, pb_y + 3, 1.5, fill=DIV)
 rrect(32, pb_y, 32 + 180 * 0.69, pb_y + 3, 1.5, fill=ACCENT)
+# 最近一次**填写过的**体脂。体脂测量频率低，没填过则整行不出现
+txt(32, pb_y + 14, "体脂 21.8%", 11, SEC)
 
 # 右栏：水平（四段等宽）
 rx1 = SCREEN_W - 32      # 右栏固定 129dp，贴卡片右内边
@@ -134,7 +118,7 @@ txt((rx0 + rx1) / 2, gt + 58, "标准", 15, PRI, bold=True, anchor="ma")
 txt((rx0 + rx1) / 2, gt + 82, "BMI 22.4", 11, SEC, anchor="ma")
 
 # ══════════════════════ 图表卡片 ══════════════════════
-ct = STATUS_H + 294
+ct = STATUS_H + 200
 CH = 356
 rrect(16, ct, SCREEN_W - 16, ct + CH, 20, fill=CARD, outline=BORDER, width=0.5)
 cx0, cx1 = 32, SCREEN_W - 32
@@ -268,23 +252,32 @@ for i, (x, day) in enumerate(label_pos):
     txt(x, PB + 8, f"6月{day}日", 10, SEC, anchor=anchor)
 
 # ══════════════════════ 历史记录 ══════════════════════
-ht = STATUS_H + 668
+ht = STATUS_H + 574
 txt(16, ht, "历史记录", 15, PRI, bold=True)
 txt(SCREEN_W - 16, ht + 2, "共 27 条", 12, SEC, anchor="ra")
-items = [("68.5", "↓ 0.3", "今天 20:15"), ("68.8", "↑ 0.8", "6月29日 07:20"), ("68.0", "↓ 0.1", "6月28日 07:35")]
+# (体重, 体脂或 None, 变化量, 时间)
+items = [
+    ("68.5", "21.8", "↓ 0.3", "今天 20:15"),
+    ("68.8", None, "↑ 0.8", "6月29日 07:20"),
+    ("68.0", None, "↓ 0.1", "6月28日 07:35"),
+]
 iy = ht + 24
-for val, dl, when in items:
-    txt(16, iy + 14, val, 20, PRI, bold=True)
+for val, fat, dl, when in items:
+    txt(16, iy + 10, val, 20, PRI, bold=True)
     tw_ = d.textlength(val, font=f(20, True)) / S
-    txt(16 + tw_ + 4, iy + 21, "kg", 12, SEC)
+    txt(16 + tw_ + 4, iy + 17, "kg", 12, SEC)
+    # 体脂加在体重**右侧同一行**：多数行没有这个值，另起一行会让行高参差不齐
+    if fat:
+        kgw = d.textlength("kg", font=f(12)) / S
+        txt(16 + tw_ + 4 + kgw + 5, iy + 17, f"· {fat}%", 12, SEC)
     up = dl.startswith("↑")
-    txt(16 + tw_ + 26, iy + 21, dl, 12, (255, 107, 107) if up else ACCENT)
-    txt(SCREEN_W - 16, iy + 20, when, 13, SEC, anchor="ra")
+    txt(16, iy + 34, dl, 12, (255, 107, 107) if up else ACCENT)
+    txt(SCREEN_W - 16, iy + 16, when, 13, SEC, anchor="ra")
     d.line([(P(16), P(iy + 56)), (P(SCREEN_W - 16), P(iy + 56))], fill=DIV, width=int(round(0.5 * S)))
     iy += 56
 
-rrect(16, STATUS_H + 870, SCREEN_W - 16, STATUS_H + 914, 12, fill=DIV)
-txt(SCREEN_W / 2, STATUS_H + 884, "查看更多记录", 15, PRI, bold=True, anchor="ma")
+rrect(16, STATUS_H + 776, SCREEN_W - 16, STATUS_H + 820, 12, fill=DIV)
+txt(SCREEN_W / 2, STATUS_H + 790, "查看更多记录", 15, PRI, bold=True, anchor="ma")
 
 img.convert("RGB").save(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'home.png'), quality=95)
 print("saved", img.size)

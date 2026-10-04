@@ -23,14 +23,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.chart.ChartTab
-import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.record.RecordRow
 import com.weightdiary.app.ui.home.components.ChartCard
 
 import com.weightdiary.app.ui.home.components.GoalStatusCard
 import com.weightdiary.app.ui.home.components.HistorySection
 import com.weightdiary.app.ui.home.components.HomeSkeleton
-import com.weightdiary.app.ui.home.components.MetricsRow
 import com.weightdiary.app.ui.home.components.SettingsIconButton
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
@@ -44,8 +42,6 @@ import com.weightdiary.app.ui.theme.WeightDiaryTheme
 @Composable
 fun HomeScreen(
     state: HomeUiState,
-    onMetricClick: (Metric) -> Unit,
-
     onEditProfile: () -> Unit,
     onChartTabSelected: (ChartTab) -> Unit,
     onShiftRange: (Int) -> Unit,
@@ -96,8 +92,9 @@ fun HomeScreen(
         Spacer(Modifier.height(8.dp))
 
         // ─────────── 目标与水平卡片 ───────────
-        // 放在概览卡片行**上面**：它是「当前 / 目标 + 水平」的总览，
-        // 先给结论再给三个分项指标，读起来更顺
+        // 首屏唯一一张「总览」卡：当前 / 目标体重 + 水平条 + 最近一次体脂。
+        // 原先它下面还有一组用来切换图表指标的三张卡，那组已删掉 ——
+        // 图表现在只画体重，BMI 的预警以阈值线的形式直接进了图表。
         GoalStatusCard(
             state = state,
             onEditProfile = onEditProfile,
@@ -107,19 +104,9 @@ fun HomeScreen(
 
         Spacer(Modifier.height(dimen.cardGap))
 
-        // ─────────── 概览卡片行 ───────────
-        MetricsRow(
-            state = state,
-            onMetricClick = onMetricClick,
-            modifier = Modifier.padding(horizontal = dimen.pageHorizontal),
-        )
-
-        Spacer(Modifier.height(dimen.cardGap))
-
         // ─────────── 图表卡片 ───────────
         ChartCard(
             chart = state.chart,
-            metric = state.selectedMetric,
             hasAnyRecord = !state.isEmpty,
             onTabSelected = onChartTabSelected,
             onShiftRange = onShiftRange,

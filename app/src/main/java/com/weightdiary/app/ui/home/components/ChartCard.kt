@@ -38,11 +38,12 @@ import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.chart.Granularity
-import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.ui.common.format1
 import com.weightdiary.app.ui.common.formatShortDateTime
 import com.weightdiary.app.ui.common.formatYearMonth
 import com.weightdiary.app.ui.common.formatXLabel
+import com.weightdiary.app.ui.common.label
+import com.weightdiary.app.ui.common.color
 import com.weightdiary.app.ui.common.rangeLabel
 import com.weightdiary.app.ui.home.ChartUi
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
@@ -51,6 +52,9 @@ import kotlin.math.roundToInt
 /**
  * 图表卡片：Tab 栏 + 日期范围选择器 + 折线图。
  *
+ * **只画体重**。原先它按 [Metric] 切换纵轴，那套已经删掉 ——
+ * BMI 的预警改用阈值线（[ChartUi.referenceLines]）直接叠加进来。
+ *
  * 手势职责划分（决策记录「冲突 1」）：
  * - **点左右箭头**才是切换日期范围，这是唯一入口
  * - **图表区域内左右滑动**只做视口滚动，不切范围
@@ -58,7 +62,6 @@ import kotlin.math.roundToInt
 @Composable
 fun ChartCard(
     chart: ChartUi,
-    metric: Metric,
     /** 一条记录都没有。用于区分「首次使用」与「这段时间没数据」两种空状态 */
     hasAnyRecord: Boolean,
     onTabSelected: (ChartTab) -> Unit,
@@ -100,12 +103,8 @@ fun ChartCard(
         Spacer(Modifier.height(12.dp))
 
         if (chart.hasData) {
-            val unit = when (metric) {
-                Metric.WEIGHT -> stringResource(R.string.unit_kg)
-                Metric.BODY_FAT -> stringResource(R.string.unit_percent)
-                Metric.BMI -> ""
-            }
-            val axisTitle = stringResource(metric.axisTitleRes())
+            val unit = stringResource(R.string.unit_kg)
+            val axisTitle = stringResource(R.string.axis_weight)
             val chartDesc = stringResource(R.string.cd_chart, axisTitle, chart.points.size)
             // 切换 Tab / 日期范围时淡出淡入（设计规范 §7，200ms）。
             // 以 chart 本身作为 targetState：它是 data class，内容相同就不会触发动画。
@@ -127,7 +126,7 @@ fun ChartCard(
                     endOfDayLabel = stringResource(R.string.axis_end_of_day),
                     formatTooltip = { point ->
                         val value = point.value.format1()
-                        val withUnit = if (unit.isEmpty()) value else "$value $unit"
+                        val withUnit = "$value $unit"
                         // 月聚合点的横坐标是「月中」，不是真实测量时刻 —— 只显示到月，免得误导
                         val whenText = if (shown.granularity == Granularity.MONTHLY) {
                             point.time.formatYearMonth()
@@ -136,7 +135,43 @@ fun ChartCard(
                         }
                         "$withUnit · $whenText"
                     },
-                    goalLabel = shown.goalLine?.let { stringResource(R.string.goal_line, it.format1()) },
+                    // 目标线与 BMI 阈值线统一成一组「水平参照线」——
+                    // 它们在图上长得一样（虚线 + 左侧标签），没必要在绘制层分两套。
+                    markers = buildList {
+                        shown.referenceLines.forEach { line ->
+                            add(
+                                ChartMarker(
+                                    value = line.value,
+                                    label = stringResource(
+                                        R.string.reference_line,
+                                        line.opensLevel.label(),
+                                        line.value.format1(),
+                                    ),
+                                    color = line.opensLevel.color(),
+                                )
+                            )
+                        }
+                        shown.goalLine?.let { target ->
+                            add(
+                                ChartMarker(
+                                    value = target,
+                                    label = stringResource(R.string.goal_line, target.format1()),
+                                    color = colors.accent,
+                                )
+                            )
+                        }
+                    },
+                    goalOffscreen = shown.goalOffscreen?.let { off ->
+                        GoalOffscreenUi(
+                            text = stringResource(
+                                if (off.below) R.string.goal_offscreen_below
+                                else R.string.goal_offscreen_above,
+                                off.targetKg.format1(),
+                                kotlin.math.abs(off.gapKg).format1(),
+                            ),
+                            below = off.below,
+                        )
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -157,12 +192,6 @@ fun ChartCard(
             )
         }
     }
-}
-
-private fun Metric.axisTitleRes(): Int = when (this) {
-    Metric.WEIGHT -> R.string.axis_weight
-    Metric.BMI -> R.string.axis_bmi
-    Metric.BODY_FAT -> R.string.axis_body_fat
 }
 
 @Composable

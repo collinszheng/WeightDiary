@@ -1,6 +1,5 @@
 package com.weightdiary.app.domain.chart
 
-import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.model.WeightRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -9,6 +8,13 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+/**
+ * 聚合器测试。
+ *
+ * 2026-10 起图表**只画体重**，所以原先围绕「切换指标时锁定同一条记录」的那几条用例
+ * （体脂取哪条、没设身高 BMI 出不来…）已经没有对应代码，随之删除。
+ * 换指标的能力本身也没了，见决策记录。
+ */
 class AggregatorTest {
 
     private val zone = ZoneId.of("UTC")
@@ -31,14 +37,12 @@ class AggregatorTest {
     private fun aggregate(
         records: List<WeightRecord>,
         granularity: Granularity,
-        metric: Metric,
-        heightCm: Double? = 175.0,
+        start: String = "2026-06-01",
+        end: String = "2026-06-30",
     ) = Aggregator.aggregate(
         records = records,
-        range = rangeOf("2026-06-01", "2026-06-30"),
+        range = rangeOf(start, end),
         granularity = granularity,
-        metric = metric,
-        heightCm = heightCm,
         zone = zone,
     )
 
@@ -50,7 +54,7 @@ class AggregatorTest {
             rec(1, "2026-06-01T08:00:00Z", 68.5),
             rec(2, "2026-06-01T20:00:00Z", 69.2),
         )
-        val pts = aggregate(records, Granularity.RAW, Metric.WEIGHT)
+        val pts = aggregate(records, Granularity.RAW)
         assertEquals(2, pts.size)
         assertEquals(68.5, pts[0].value, 1e-9)
         assertEquals(69.2, pts[1].value, 1e-9)
@@ -63,37 +67,12 @@ class AggregatorTest {
             rec(2, "2026-06-15T08:00:00Z", 68.5),
             rec(3, "2026-07-01T08:00:00Z", 67.0),
         )
-        val pts = aggregate(records, Granularity.RAW, Metric.WEIGHT)
+        val pts = aggregate(records, Granularity.RAW)
         assertEquals(1, pts.size)
         assertEquals(68.5, pts[0].value, 1e-9)
     }
 
-    // ─────────────── DAILY：必须锁定同一条记录 ───────────────
-
-    /**
-     * 这是本阶段最重要的不变量。
-     *
-     * 同一天两条记录：A(68.5kg, 体脂 25.0) 和 B(69.0kg, 体脂 21.0)。
-     * 「当日最低值」应当锁定 A —— 所以体脂率要取 A 的 25.0，而**不是**两条里最低的 21.0。
-     * 若对每个指标各自取最小值，图上会出现「最低体重」和「最低体脂」来自两次不同称重的错位。
-     */
-    @Test
-    fun `DAILY 锁定同一条记录 - 体脂率跟体重走而不是各取最小`() {
-        val records = listOf(
-            rec(1, "2026-06-01T07:00:00Z", 68.5, fat = 25.0),
-            rec(2, "2026-06-01T20:00:00Z", 69.0, fat = 21.0),
-        )
-
-        val weight = aggregate(records, Granularity.DAILY, Metric.WEIGHT)
-        assertEquals(1, weight.size)
-        assertEquals(68.5, weight[0].value, 1e-9)
-        assertEquals(1L, weight[0].sourceRecordId)
-
-        val fat = aggregate(records, Granularity.DAILY, Metric.BODY_FAT)
-        assertEquals(1, fat.size)
-        assertEquals("体脂率应取自当日最低体重那条记录", 25.0, fat[0].value, 1e-9)
-        assertEquals(1L, fat[0].sourceRecordId)
-    }
+    // ─────────────── DAILY ───────────────
 
     @Test
     fun `DAILY 每天一个点`() {
@@ -102,41 +81,37 @@ class AggregatorTest {
             rec(2, "2026-06-01T20:00:00Z", 69.2),
             rec(3, "2026-06-03T07:00:00Z", 68.0),
         )
-        val pts = aggregate(records, Granularity.DAILY, Metric.WEIGHT)
+        val pts = aggregate(records, Granularity.DAILY)
         assertEquals(2, pts.size)
         assertEquals(68.5, pts[0].value, 1e-9)
         assertEquals(68.0, pts[1].value, 1e-9)
     }
 
+    /**
+     * 同一天记了多条时取**体重最低**的那条，并且 `sourceRecordId` 要指向它本人
+     * —— 气泡与选中态靠这个 id 定位，指错了会选到另一条记录。
+     */
     @Test
-    fun `DAILY 遇到缺该指标的记录会顺延到下一条`() {
+    fun `DAILY 取当日体重最低的那条记录`() {
         val records = listOf(
-            rec(1, "2026-06-01T07:00:00Z", 68.5, fat = null), // 当日最低但没填体脂
-            rec(2, "2026-06-01T20:00:00Z", 69.0, fat = 21.0),
+            rec(1, "2026-06-01T07:00:00Z", 69.0),
+            rec(2, "2026-06-01T20:00:00Z", 68.5),
+            rec(3, "2026-06-01T22:00:00Z", 68.8),
         )
-        val fat = aggregate(records, Granularity.DAILY, Metric.BODY_FAT)
-        assertEquals(1, fat.size)
-        assertEquals(21.0, fat[0].value, 1e-9)
-        assertEquals(2L, fat[0].sourceRecordId)
+        val pts = aggregate(records, Granularity.DAILY)
+        assertEquals(1, pts.size)
+        assertEquals(68.5, pts[0].value, 1e-9)
+        assertEquals(2L, pts[0].sourceRecordId)
     }
 
     @Test
-    fun `没填体脂的记录不会变成 0`() {
-        val records = listOf(rec(1, "2026-06-01T07:00:00Z", 68.5, fat = null))
-        assertTrue(aggregate(records, Granularity.DAILY, Metric.BODY_FAT).isEmpty())
-    }
-
-    @Test
-    fun `没设身高时 BMI 出不来 - 不崩也不给 0`() {
-        val records = listOf(rec(1, "2026-06-01T07:00:00Z", 68.5))
-        assertTrue(aggregate(records, Granularity.DAILY, Metric.BMI, heightCm = null).isEmpty())
-    }
-
-    @Test
-    fun `BMI 由体重与身高实时算出`() {
-        val records = listOf(rec(1, "2026-06-01T07:00:00Z", 68.5))
-        val pts = aggregate(records, Granularity.DAILY, Metric.BMI, heightCm = 175.0)
-        assertEquals(22.4, pts[0].value, 1e-9)
+    fun `DAILY 的横坐标是那条记录的真实测量时刻`() {
+        val records = listOf(
+            rec(1, "2026-06-01T07:00:00Z", 69.0),
+            rec(2, "2026-06-01T20:00:00Z", 68.5),
+        )
+        val pts = aggregate(records, Granularity.DAILY)
+        assertEquals("2026-06-01T20:00:00Z", pts[0].time.toString())
     }
 
     // ─────────────── MONTHLY ───────────────
@@ -151,13 +126,9 @@ class AggregatorTest {
             rec(1, "2026-06-01T07:00:00Z", 68.0),
             rec(2, "2026-06-03T07:00:00Z", 67.0),
         )
-        val pts = aggregate(records, Granularity.MONTHLY, Metric.WEIGHT)
+        val pts = aggregate(records, Granularity.MONTHLY)
         assertEquals(1, pts.size)
-        assertEquals(
-            "点应当落在 6 月 15 日中午",
-            "2026-06-15T12:00:00Z",
-            pts[0].time.toString(),
-        )
+        assertEquals("点应当落在 6 月 15 日中午", "2026-06-15T12:00:00Z", pts[0].time.toString())
     }
 
     @Test
@@ -167,31 +138,37 @@ class AggregatorTest {
             rec(2, "2026-06-15T07:00:00Z", 68.0),
             rec(3, "2026-06-30T07:00:00Z", 66.0),
         )
-        val pts = aggregate(records, Granularity.MONTHLY, Metric.WEIGHT)
+        val pts = aggregate(records, Granularity.MONTHLY)
         assertEquals(1, pts.size)
         assertEquals(68.0, pts[0].value, 1e-9)
     }
 
     @Test
     fun `MONTHLY 跨月分成多个点`() {
-        // 区间要覆盖到 7 月，否则 7 月那条会被范围过滤掉
         val records = listOf(
             rec(1, "2026-06-10T07:00:00Z", 68.0),
             rec(2, "2026-06-20T07:00:00Z", 67.0),
             rec(3, "2026-07-05T07:00:00Z", 66.0),
         )
-        val pts = Aggregator.aggregate(
-            records = records,
-            range = rangeOf("2026-06-01", "2026-07-31"),
-            granularity = Granularity.MONTHLY,
-            metric = Metric.WEIGHT,
-            heightCm = 175.0,
-            zone = zone,
-        )
+        val pts = aggregate(records, Granularity.MONTHLY, start = "2026-06-01", end = "2026-07-31")
         assertEquals(2, pts.size)
         assertEquals(67.5, pts[0].value, 1e-9)
         assertEquals(66.0, pts[1].value, 1e-9)
     }
+
+    /** 代表记录取该月最后一条 —— 气泡定位靠它 */
+    @Test
+    fun `MONTHLY 的代表记录是当月最后一条`() {
+        val records = listOf(
+            rec(1, "2026-06-01T07:00:00Z", 70.0),
+            rec(2, "2026-06-15T07:00:00Z", 68.0),
+            rec(3, "2026-06-30T07:00:00Z", 66.0),
+        )
+        val pts = aggregate(records, Granularity.MONTHLY)
+        assertEquals(3L, pts[0].sourceRecordId)
+    }
+
+    // ─────────────── 通用 ───────────────
 
     @Test
     fun `结果按时间升序`() {
@@ -200,14 +177,22 @@ class AggregatorTest {
             rec(2, "2026-06-01T07:00:00Z", 69.0),
             rec(3, "2026-06-02T07:00:00Z", 68.5),
         )
-        val pts = aggregate(records, Granularity.DAILY, Metric.WEIGHT)
+        val pts = aggregate(records, Granularity.DAILY)
         assertEquals(listOf(69.0, 68.5, 68.0), pts.map { it.value })
     }
 
     @Test
     fun `空输入产出空列表`() {
-        assertTrue(aggregate(emptyList(), Granularity.DAILY, Metric.WEIGHT).isEmpty())
-        assertTrue(aggregate(emptyList(), Granularity.MONTHLY, Metric.WEIGHT).isEmpty())
-        assertTrue(aggregate(emptyList(), Granularity.RAW, Metric.WEIGHT).isEmpty())
+        assertTrue(aggregate(emptyList(), Granularity.DAILY).isEmpty())
+        assertTrue(aggregate(emptyList(), Granularity.MONTHLY).isEmpty())
+        assertTrue(aggregate(emptyList(), Granularity.RAW).isEmpty())
+    }
+
+    @Test
+    fun `没填体脂不影响体重聚合`() {
+        val records = listOf(rec(1, "2026-06-01T07:00:00Z", 68.5, fat = null))
+        val pts = aggregate(records, Granularity.DAILY)
+        assertEquals(1, pts.size)
+        assertEquals(68.5, pts[0].value, 1e-9)
     }
 }

@@ -29,6 +29,7 @@ import com.weightdiary.app.ui.common.TimeLabel
 import com.weightdiary.app.ui.common.toTimeLabel
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 import com.weightdiary.app.ui.theme.tabular
+import kotlin.math.abs
 
 /** 列表项高度（设计规范 §4.5） */
 private val ROW_HEIGHT = 56.dp
@@ -61,7 +62,16 @@ fun RecordRowItem(
 
     val timeText = row.measuredAt.toTimeLabel().asText()
     val weightText = row.weightKg.format1()
-    val description = stringResource(R.string.cd_record_row, "$weightText kg", timeText)
+    // 体脂是可见文本，读屏描述里也要带上 —— 否则 Row 上的 contentDescription
+    // 会把子元素的文字整个盖掉，读屏用户永远听不到体脂
+    val description = row.bodyFatPercent?.let { fat ->
+        stringResource(
+            R.string.cd_record_row_with_fat,
+            weightText,
+            fat.format1(),
+            timeText,
+        )
+    } ?: stringResource(R.string.cd_record_row, "$weightText kg", timeText)
 
     Row(
         modifier = modifier
@@ -101,6 +111,19 @@ fun RecordRowItem(
                     color = colors.textSecondary,
                     modifier = Modifier.padding(bottom = 2.dp),
                 )
+
+                // 体脂加在体重**右侧的同一行**：体脂测量频率远低于体重，多数行没有这个值，
+                // 若另起一行会让行高参差不齐。加在同一行就只增加长度，不增加高度。
+                row.bodyFatPercent?.let { fat ->
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = stringResource(R.string.body_fat_inline, fat.format1()),
+                        style = typo.unit.tabular,
+                        color = colors.textSecondary,
+                        maxLines = 1,
+                        modifier = Modifier.padding(bottom = 2.dp),
+                    )
+                }
             }
             row.deltaKg?.let {
                 DeltaText(deltaKg = it, modifier = Modifier)
@@ -122,4 +145,39 @@ internal fun TimeLabel.asText(): String = when (this) {
     is TimeLabel.Today -> stringResource(R.string.time_today, time)
     is TimeLabel.Yesterday -> stringResource(R.string.time_yesterday, time)
     is TimeLabel.Absolute -> text
+}
+
+/**
+ * 变化量文字：`↓ 0.3` / `↑ 0.8` / `— 0.0`。
+ *
+ * 箭头之外还有颜色，但**颜色不是唯一信息载体** —— 箭头本身也是语义（无障碍要求）。
+ * 原先它与概览卡片共用，那张卡片删掉后就只剩历史记录行这一个用户了。
+ */
+@Composable
+internal fun DeltaText(deltaKg: Double, modifier: Modifier = Modifier) {
+    val colors = WeightDiaryTheme.colors
+    val typo = WeightDiaryTheme.typography
+
+    val flat = abs(deltaKg) < 0.05
+    val down = deltaKg < 0
+    val magnitude = abs(deltaKg).format1()
+
+    val text = when {
+        flat -> stringResource(R.string.delta_flat, magnitude)
+        down -> stringResource(R.string.delta_down, magnitude)
+        else -> stringResource(R.string.delta_up, magnitude)
+    }
+    val color = when {
+        flat -> colors.textSecondary
+        down -> colors.deltaDown
+        else -> colors.deltaUp
+    }
+
+    Text(
+        text = text,
+        style = typo.caption,
+        color = color,
+        maxLines = 1,
+        modifier = modifier,
+    )
 }

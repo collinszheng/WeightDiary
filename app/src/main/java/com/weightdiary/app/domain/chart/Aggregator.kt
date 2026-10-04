@@ -1,6 +1,5 @@
 package com.weightdiary.app.domain.chart
 
-import com.weightdiary.app.domain.model.Metric
 import com.weightdiary.app.domain.model.WeightRecord
 import java.time.Instant
 import java.time.YearMonth
@@ -9,10 +8,12 @@ import java.time.ZoneId
 /**
  * 把原始记录聚合成绘图点。
  *
- * 两条铁律：
- * 1. **「当日最低值」必须锁定同一条记录** —— 先按体重选出当天最低的那条，再取它的 BMI / 体脂率。
- *    对三个指标各自取最小值会让同一天的点来自两次不同称重，图上自相矛盾。
- * 2. **算不出值的记录要被跳过**，不能当成 0 —— 没填体脂率、或没设身高算不出 BMI 的情况很常见。
+ * 图表**只画体重**。原先它支持按指标（体重 / BMI / 体脂率）取数，那张用来切指标的卡片
+ * 已经删掉了，所以这里不再有任何指标换算，也不需要「算不出值的记录要跳过」那套逻辑。
+ *
+ * 2026-10 之前这里有一条铁律：「当日最低值必须锁定同一条记录」。它存在的理由是
+ * **不能让同一天的点来自两次不同称重**（体重取早上的、体脂取晚上的）。只画体重之后
+ * 这条约束自动满足 —— 取的就是那条记录本身。
  */
 object Aggregator {
 
@@ -20,78 +21,51 @@ object Aggregator {
         records: List<WeightRecord>,
         range: ChartRange,
         granularity: Granularity,
-        metric: Metric,
-        heightCm: Double?,
         zone: ZoneId,
     ): List<ChartPoint> {
         val inRange = records.filter { it.measuredAt >= range.start && it.measuredAt <= range.end }
 
         return when (granularity) {
             Granularity.RAW -> inRange
-                .mapNotNull { record ->
-                    metric.readFrom(record, heightCm)?.let {
-                        ChartPoint(record.measuredAt, it, record.id)
-                    }
-                }
+                .map { ChartPoint(it.measuredAt, it.weightKg, it.id) }
                 .sortedBy { it.time }
 
             Granularity.DAILY -> inRange
                 .groupBy { it.measuredAt.atZone(zone).toLocalDate() }
                 .toSortedMap()
-                .mapNotNull { (_, dayRecords) -> dailyPoint(dayRecords, metric, heightCm) }
+                .map { (_, dayRecords) -> dailyPoint(dayRecords) }
 
             Granularity.MONTHLY -> inRange
                 .groupBy {
                     it.measuredAt.atZone(zone).let { z -> YearMonth.of(z.year, z.monthValue) }
                 }
                 .toSortedMap()
-                .mapNotNull { (month, monthRecords) ->
-                    monthlyPoint(month, monthRecords, metric, heightCm, zone)
-                }
+                .map { (month, monthRecords) -> monthlyPoint(month, monthRecords, zone) }
         }
     }
 
-    /**
-     * 当日最低值。
-     *
-     * 先按**体重**选出当天最低的那条记录（与当前展示哪个指标无关），再从这个记录上读指标值。
-     * 若这条记录恰好没有当前指标的值（比如没填体脂），则往后顺延到当日体重次低、但该指标有值的记录。
-     */
-    private fun dailyPoint(
-        dayRecords: List<WeightRecord>,
-        metric: Metric,
-        heightCm: Double?,
-    ): ChartPoint? =
-        dayRecords
-            .sortedBy { it.weightKg }
-            .firstNotNullOfOrNull { record ->
-                metric.readFrom(record, heightCm)?.let {
-                    ChartPoint(record.measuredAt, it, record.id)
-                }
-            }
+    /** 当日最低体重那条记录。`groupBy` 的分组至少有一个元素，所以 `minBy` 安全。 */
+    private fun dailyPoint(dayRecords: List<WeightRecord>): ChartPoint {
+        val lowest = dayRecords.minBy { it.weightKg }
+        return ChartPoint(lowest.measuredAt, lowest.weightKg, lowest.id)
+    }
 
     /**
-     * 月平均值。这里对指标值直接求平均 —— 平均值不需要「锁定同一条记录」，
-     * 因为它是聚合量而不是挑出来的样本。
+     * 月平均值。
      *
      * 点的横坐标取**月中**（15 日中午），不是该月最后一条记录的时间：
      * 当前月才过了几天时（比如 10 月只到 3 号），用最后一条记录会让 10 月的点
      * 紧贴 9 月的点、糊成一团。月中位置也与年视图的 X 轴刻度对齐。
+     *
+     * 代表记录取该月**最后一条**，只用于气泡定位时的身份标识。
      */
     private fun monthlyPoint(
         month: YearMonth,
         monthRecords: List<WeightRecord>,
-        metric: Metric,
-        heightCm: Double?,
         zone: ZoneId,
-    ): ChartPoint? {
-        val valued = monthRecords.mapNotNull { record ->
-            metric.readFrom(record, heightCm)?.let { record to it }
-        }
-        if (valued.isEmpty()) return null
-        val avg = valued.map { it.second }.average()
-        // 用该月最后一条记录作为「代表记录」，供切换指标时保持身份一致
-        val representative = valued.maxByOrNull { it.first.measuredAt }!!.first
+    ): ChartPoint {
+        val avg = monthRecords.map { it.weightKg }.average()
+        val representative = monthRecords.maxBy { it.measuredAt }
         return ChartPoint(monthMidpoint(month, zone), avg, representative.id)
     }
 

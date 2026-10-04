@@ -1,7 +1,6 @@
 package com.weightdiary.app.domain.chart
 
-import com.weightdiary.app.domain.model.Metric
-import com.weightdiary.app.domain.model.WeightRecord
+import com.weightdiary.app.domain.model.Level
 import java.time.Instant
 
 /** 图表顶部的时间跨度 Tab */
@@ -58,10 +57,7 @@ data class ChartRange(
 }
 
 /**
- * 一个绘图点。
- *
- * [sourceRecordId] 很关键：切换指标时「当日最低值」必须锁定**同一条记录**，
- * 否则同一天会出现「最低体重」和「最低体脂」来自两次不同称重的错位（见技术设计 §4.3）。
+ * 一条绘图点……
  */
 data class ChartPoint(
     val time: Instant,
@@ -70,20 +66,16 @@ data class ChartPoint(
 )
 
 /**
- * 取某个指标在一条记录上的值。
+ * 图表上的一条水平参照线 —— BMI 分级阈值换算成体重后的位置。
  *
- * 返回 `null` 表示这条记录**参与不了**这个指标 —— 例如没填体脂率记录、或没设身高算不出 BMI。
- * 聚合时这类记录要被跳过，而不是当成 0。
+ * **只放数值与语义，不放文案与颜色**：ViewModel 没有 Context，文案一律由 Composable
+ * 查 strings.xml 组装（决策 C5），颜色同理走 `WeightDiaryTheme`。
+ *
+ * 是否把它画出来由调用方决定：**只有落进当前 Y 轴窗口的才会出现在列表里**，
+ * 视野外的一律不画，也绝不为了画它去撑大坐标轴。
  */
-fun Metric.readFrom(record: WeightRecord, heightCm: Double?): Double? = when (this) {
-    Metric.WEIGHT -> record.weightKg
-    Metric.BMI -> heightCm
-        ?.takeIf { it > 0.0 }
-        ?.let { com.weightdiary.app.domain.bmi.BmiCalculator.calculate(record.weightKg, it) }
-
-    Metric.BODY_FAT -> record.bodyFatPercent
-}
-
-/** 图表 Y 轴的标题文案 key。UI 层拿去查 strings.xml。 */
-val Metric.usesDecimalAxis: Boolean
-    get() = this != Metric.BMI
+data class ReferenceLine(
+    val value: Double,
+    /** 这条线是**哪一档的起点**：18.5 起为「正常」、24.0 起为「超重」、28.0 起为「肥胖」 */
+    val opensLevel: Level,
+)

@@ -5,6 +5,17 @@ import com.weightdiary.app.domain.model.BmiStandard
 import com.weightdiary.app.domain.model.Level
 
 /**
+ * 一条 BMI 分级阈值：BMI 达到 [bmi] 就进入 [opensLevel] 这一档。
+ *
+ * 它是「分级」而不是「区间」，因为它只描述边界在哪、开启哪一档，
+ * 不关心上面一档到哪结束（那是下一条阈值的事）。
+ */
+data class BmiThreshold(
+    val bmi: Double,
+    val opensLevel: Level,
+)
+
+/**
  * BMI 分级与四色条滑块定位。
  *
  * 四色条**四段等宽**（见决策 B13），所以滑块位置**不能**按 BMI 线性映射，
@@ -54,6 +65,19 @@ object BmiClassifier {
         standard.underweightLimit to standard.normalLimit,
         standard.normalLimit to standard.overweightLimit,
         standard.overweightLimit to SLIDER_MAX,
+    )
+
+    /**
+     * 三条分级阈值，各自标注「从这一档起算」。
+     *
+     * 图表把它们画成水平参照线（换算成体重由调用方乘身高² 完成）。
+     * 命名取向是**这条线开启了哪一档** —— `24.0` 那条读作「超重 73.4」，
+     * 即「超过这条线就是超重」，比读作「正常上限」更直接。
+     */
+    fun thresholds(standard: BmiStandard = BmiStandard.CHINA): List<BmiThreshold> = listOf(
+        BmiThreshold(standard.underweightLimit, Level.NORMAL),
+        BmiThreshold(standard.normalLimit, Level.OVERWEIGHT),
+        BmiThreshold(standard.overweightLimit, Level.OBESE),
     )
 
     /** @return 0f..1f，四色条上的归一化位置 */
