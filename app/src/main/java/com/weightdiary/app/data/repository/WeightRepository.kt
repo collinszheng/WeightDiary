@@ -24,12 +24,11 @@ import java.time.Instant
  * 记录与档案的统一出口。UI 层只跟它打交道，不直接碰 Room / DataStore。
  */
 class WeightRepository(
-    database: WeightDatabase,
+    private val database: WeightDatabase,
     private val profileStore: ProfileStore,
     private val syncStore: SyncStore,
 ) {
 
-    private val database = database
     private val dao = database.weightDao()
 
     val records: Flow<List<WeightRecord>> =
