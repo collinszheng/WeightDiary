@@ -3,8 +3,11 @@ package com.weightdiary.app.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.weightdiary.app.data.healthconnect.HealthConnectAvailability
 import com.weightdiary.app.data.backup.RecordBackup
 import com.weightdiary.app.data.repository.WeightRepository
+import com.weightdiary.app.data.sync.SyncOutcome
+import com.weightdiary.app.data.sync.WeightSyncCoordinator
 import com.weightdiary.app.domain.bmi.BmiCalculator
 import com.weightdiary.app.domain.bmi.BmiClassifier
 import com.weightdiary.app.domain.chart.Aggregator
@@ -13,6 +16,7 @@ import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.chart.RangeResolver
 import com.weightdiary.app.domain.chart.ReferenceLines
 import com.weightdiary.app.domain.model.BmiStandard
+import com.weightdiary.app.domain.model.RecordSource
 import com.weightdiary.app.domain.model.UserProfile
 import com.weightdiary.app.domain.model.WeightRecord
 import com.weightdiary.app.domain.record.RecordRow
@@ -33,6 +37,7 @@ import java.time.ZoneId
 class HomeViewModel(
     private val repository: WeightRepository,
     private val backup: RecordBackup,
+    private val syncCoordinator: WeightSyncCoordinator,
 ) : ViewModel() {
 
     private val activeSheet = MutableStateFlow(ActiveSheet.NONE)
@@ -47,7 +52,13 @@ class HomeViewModel(
     /** 整屏导航。设置是整屏，不是弹窗 */
     private val screen = MutableStateFlow(Screen.HOME)
 
-
+    /**
+     * 同步入口的状态。SDK 的可用性查询不是 Flow（要问系统装没装），
+     * 所以在 init 和每次同步后各刷一次，不轮询。
+     */
+    private val syncAvailability = MutableStateFlow(SyncAvailabilityUi.UNSUPPORTED)
+    private val syncGranted = MutableStateFlow(false)
+    private val syncing = MutableStateFlow(false)
 
     /** 一次性事件用 Channel 而不是 StateFlow：Snackbar 这类事件不该在旋转屏幕后被重放。 */
     private val _events = Channel<HomeEvent>(Channel.BUFFERED)
@@ -56,6 +67,7 @@ class HomeViewModel(
     private data class DataSnapshot(
         val records: List<WeightRecord>,
         val profile: UserProfile,
+        val lastSyncAt: Instant?,
     )
 
     /** 纯 UI 的局部状态，打包成一个流，好让 combine 保持在 5 个以内 */
@@ -63,15 +75,24 @@ class HomeViewModel(
         val sheet: ActiveSheet,
         val editingId: Long?,
         val screen: Screen,
+        val sync: SyncLocal,
     )
 
     private val dataSnapshot = combine(
         repository.records,
         repository.profile,
+        repository.lastSyncAt,
         ::DataSnapshot,
     )
 
-    private val uiLocal = combine(activeSheet, editingId, screen, ::UiLocal)
+    private val syncLocal = combine(
+        syncAvailability,
+        syncGranted,
+        syncing,
+        ::SyncLocal,
+    )
+
+    private val uiLocal = combine(activeSheet, editingId, screen, syncLocal, ::UiLocal)
 
     val uiState: StateFlow<HomeUiState> = combine(
         dataSnapshot,
@@ -79,12 +100,75 @@ class HomeViewModel(
         chartAnchor,
         uiLocal,
     ) { data, tab, anchor, local ->
-        buildState(data.records, data.profile, local.sheet, local.editingId, local.screen, tab, anchor)
+        buildState(
+            records = data.records,
+            profile = data.profile,
+            sheet = local.sheet,
+            editingId = local.editingId,
+            screen = local.screen,
+            tab = tab,
+            anchor = anchor,
+            sync = local.sync,
+            lastSyncAt = data.lastSyncAt,
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = HomeUiState(),
     )
+
+    init {
+        viewModelScope.launch { refreshSyncStatus() }
+    }
+
+    // ─────────────── 体脂秤同步 ───────────────
+
+    private suspend fun refreshSyncStatus() {
+        val availability = syncCoordinator.availability().toUi()
+        syncAvailability.value = availability
+        syncGranted.value = availability == SyncAvailabilityUi.AVAILABLE &&
+            syncCoordinator.hasPermissions()
+    }
+
+    /** 用户在系统弹窗里授权（或拒绝）之后回调。授权成了就立刻同步一次 */
+    fun onPermissionsResult(granted: Set<String>) {
+        val ok = syncCoordinator.permissionsSatisfied(granted)
+        syncGranted.value = ok
+        if (ok) syncNow()
+    }
+
+    fun syncNow() {
+        if (syncing.value) return
+        viewModelScope.launch {
+            syncing.value = true
+            when (val outcome = syncCoordinator.sync()) {
+                is SyncOutcome.Success -> {
+                    syncGranted.value = true
+                    _events.send(
+                        HomeEvent.SyncFinished(
+                            inserted = outcome.inserted,
+                            claimed = outcome.claimed,
+                            skipped = outcome.skippedCount,
+                        )
+                    )
+                }
+
+                is SyncOutcome.Unavailable -> {
+                    val ui = outcome.availability.toUi()
+                    syncAvailability.value = ui
+                    _events.send(HomeEvent.SyncUnavailable(ui))
+                }
+
+                SyncOutcome.PermissionDenied -> {
+                    syncGranted.value = false
+                    _events.send(HomeEvent.SyncPermissionDenied)
+                }
+
+                is SyncOutcome.Failed -> _events.send(HomeEvent.SyncFailed(outcome.reason))
+            }
+            syncing.value = false
+        }
+    }
 
     // ─────────────── 图表 ───────────────
 
@@ -191,6 +275,8 @@ class HomeViewModel(
     fun openSettings() {
         activeSheet.value = ActiveSheet.NONE
         screen.value = Screen.SETTINGS
+        // 用户可能刚从系统设置里改了授权，回来看一眼状态
+        viewModelScope.launch { refreshSyncStatus() }
     }
 
     fun closeSettings() {
@@ -225,6 +311,7 @@ class HomeViewModel(
     fun clearAllData() {
         viewModelScope.launch {
             repository.clearAll()
+            // 清空连带把同步水位线也清了，状态行要跟着回到「从未同步」
             _events.send(HomeEvent.DataCleared)
         }
     }
@@ -236,6 +323,8 @@ class HomeViewModel(
      *
      * 这是**不可撤销**的 —— 防误删由「左滑露出按钮 + 点按钮二次确认」承担，
      * 因此不再有「已删除」的撤销 Snackbar。
+     *
+     * 同步来的记录被删时，仓库会同时写下墓碑，否则下次同步它会复活。
      */
     fun deleteRecord(row: RecordRow) {
         viewModelScope.launch {
@@ -278,13 +367,33 @@ class HomeViewModel(
         fun factory(
             repository: WeightRepository,
             backup: RecordBackup,
+            syncCoordinator: WeightSyncCoordinator,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                HomeViewModel(repository, backup) as T
+                HomeViewModel(repository, backup, syncCoordinator) as T
         }
     }
 }
+
+/** data 层的可用性 → UI 层的镜像。Composable 不认识 SDK 的类型 */
+private fun HealthConnectAvailability.toUi(): SyncAvailabilityUi = when (this) {
+    HealthConnectAvailability.AVAILABLE -> SyncAvailabilityUi.AVAILABLE
+    HealthConnectAvailability.NEEDS_UPDATE -> SyncAvailabilityUi.NEEDS_UPDATE
+    HealthConnectAvailability.NOT_INSTALLED -> SyncAvailabilityUi.NOT_INSTALLED
+    HealthConnectAvailability.UNSUPPORTED -> SyncAvailabilityUi.UNSUPPORTED
+}
+
+/**
+ * UI 层的同步局部状态。
+ *
+ * 放在文件级而不是 ViewModel 内部：`buildState` 是顶层私有函数，够不着嵌套类。
+ */
+private data class SyncLocal(
+    val availability: SyncAvailabilityUi,
+    val granted: Boolean,
+    val syncing: Boolean,
+)
 
 private fun buildState(
     records: List<WeightRecord>,
@@ -294,6 +403,8 @@ private fun buildState(
     screen: Screen,
     tab: ChartTab,
     anchor: LocalDate,
+    sync: SyncLocal,
+    lastSyncAt: Instant?,
     zone: ZoneId = ZoneId.systemDefault(),
     today: LocalDate = LocalDate.now(zone),
 ): HomeUiState {
@@ -345,6 +456,14 @@ private fun buildState(
         history = rows.take(HOME_HISTORY_LIMIT),
         allRecords = rows,
         editing = editingId?.let { id -> rows.firstOrNull { it.id == id } },
+        healthConnect = HealthConnectUi(
+            availability = sync.availability,
+            granted = sync.granted,
+            syncing = sync.syncing,
+            lastSyncAt = lastSyncAt,
+            syncedCount = records.count { it.source == RecordSource.HEALTH_CONNECT },
+            needsAnchor = records.isEmpty(),
+        ),
     )
 }
 

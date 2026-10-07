@@ -142,4 +142,35 @@
     <string name="snack_cleared">已清空所有记录</string>
     <string name="snack_export_failed">导出失败：%1$s</string>
     <string name="snack_import_failed">导入失败：%1$s</string>
+
+    <!-- 体脂秤同步（Health Connect）—— 走设备内 IPC，不联网 -->
+    <string name="settings_health_connect">体脂秤同步</string>
+    <string name="settings_hc_needs_anchor">先记一条你自己的体重，再接入体脂秤</string>
+    <string name="settings_hc_not_installed">需要先安装「健康数据共享」</string>
+    <string name="settings_hc_needs_update">「健康数据共享」需要更新</string>
+    <string name="settings_hc_needs_permission">读取体重与体脂率，不联网</string>
+    <string name="settings_hc_ready">点此读取体脂秤数据</string>
+    <string name="settings_hc_syncing">正在同步…</string>
+    <string name="settings_hc_synced">上次 %1$s · 已同步 %2$d 条</string>
+
+    <string name="snack_sync_done">已同步 %1$d 条</string>
+    <string name="snack_sync_done_skipped">已同步 %1$d 条，跳过 %2$d 条</string>
+    <string name="snack_sync_done_claimed">已同步 %1$d 条，%2$d 条并入了已有记录</string>
+    <string name="snack_sync_claimed_only">%1$d 条并入了已有记录，没有新增</string>
+    <!-- 首次接入必然走到这条：引导记录的时间就是边界，之前的数据一律不收（docs/08 §6.4） -->
+    <string name="snack_sync_start_fresh">已连接，将从现在开始记录新的称重</string>
+    <string name="snack_sync_nothing">已连接，没有新的称重记录</string>
+    <string name="snack_sync_not_installed">这台设备上没有「健康数据共享」，请先从应用商店安装</string>
+    <string name="snack_sync_unsupported">这台设备的系统版本不支持体脂秤同步</string>
+    <string name="snack_sync_needs_update">「健康数据共享」需要更新后才能使用</string>
+    <string name="snack_sync_denied">没有拿到读取权限，无法同步</string>
+    <string name="snack_sync_failed">同步失败：%1$s</string>
+
+    <!--
+      Health Connect 的权限说明页。缺了这个页面 HC 的授权弹窗**根本不会出现**
+      （见 PermissionsRationaleActivity 的注释），所以它不是为了应付审核。
+    -->
+    <string name="rationale_body">体重日记通过系统的「健康数据共享」读取你的体重与体脂率，用来画出趋势图。</string>
+    <string name="rationale_privacy">数据只在本机处理。这个 App 没有网络权限，不会上传任何内容。</string>
+    <string name="rationale_dismiss">知道了</string>
 </resources>

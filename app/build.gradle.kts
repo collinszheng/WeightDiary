@@ -13,7 +13,7 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val appVersionName = "1.0"
+val appVersionName = "1.1"
 
 android {
     namespace = "com.weightdiary.app"
@@ -23,7 +23,7 @@ android {
         applicationId = "com.weightdiary.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        versionCode = 2
         versionName = appVersionName
     }
 
@@ -98,6 +98,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.androidx.datastore.preferences)
+
+    implementation(libs.androidx.health.connect.client)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

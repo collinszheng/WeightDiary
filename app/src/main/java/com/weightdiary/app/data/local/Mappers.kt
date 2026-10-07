@@ -1,5 +1,6 @@
 package com.weightdiary.app.data.local
 
+import com.weightdiary.app.domain.model.RecordSource
 import com.weightdiary.app.domain.model.WeightRecord
 import java.time.Instant
 
@@ -17,6 +18,7 @@ fun WeightRecordEntity.toDomain(): WeightRecord = WeightRecord(
     note = note,
     createdAt = Instant.ofEpochMilli(createdAt),
     updatedAt = Instant.ofEpochMilli(updatedAt),
+    source = source.toRecordSource(),
 )
 
 fun WeightRecord.toEntity(): WeightRecordEntity = WeightRecordEntity(
@@ -27,4 +29,12 @@ fun WeightRecord.toEntity(): WeightRecordEntity = WeightRecordEntity(
     note = note,
     createdAt = createdAt.toEpochMilli(),
     updatedAt = updatedAt.toEpochMilli(),
+    source = source.name,
 )
+
+/**
+ * 存的是枚举名，读回来时认不出就当手动记录 ——
+ * 宁可把一条陌生的来源降级成 MANUAL，也不要因为一个字符串让整个界面崩掉。
+ */
+fun String.toRecordSource(): RecordSource =
+    RecordSource.entries.firstOrNull { it.name == this } ?: RecordSource.MANUAL

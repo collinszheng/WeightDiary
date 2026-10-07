@@ -45,6 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.model.BmiStandard
+import com.weightdiary.app.ui.common.formatShortDateTime
+import com.weightdiary.app.ui.home.HealthConnectUi
+import com.weightdiary.app.ui.home.SyncAvailabilityUi
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
 /**
@@ -62,10 +65,12 @@ fun SettingsScreen(
     bmiStandard: BmiStandard,
     recordCount: Int,
     versionName: String,
+    healthConnect: HealthConnectUi,
     onBack: () -> Unit,
     onBmiStandardChange: (BmiStandard) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
+    onHealthConnectClick: () -> Unit,
     onClearData: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -162,6 +167,16 @@ fun SettingsScreen(
                     description = stringResource(R.string.settings_import_desc),
                     onClick = onImport,
                 )
+                // 体脂秤同步。API < 28 时**整行不显示** —— 宁可功能不出现，
+                // 也不能画一个永远可点、永远失败的按钮（docs/06 §2.2）
+                if (healthConnect.availability != SyncAvailabilityUi.UNSUPPORTED) {
+                    GroupDivider()
+                    SettingsRow(
+                        title = stringResource(R.string.settings_health_connect),
+                        description = healthConnectDescription(healthConnect),
+                        onClick = onHealthConnectClick,
+                    )
+                }
                 GroupDivider()
                 SettingsRow(
                     title = stringResource(R.string.settings_clear),
@@ -403,4 +418,34 @@ private fun BmiStandardSelector(
             }
         }
     }
+}
+
+/**
+ * 体脂秤那一行的说明文字。
+ *
+ * 顺序有讲究：**首次接入的引导排在所有状态之前** —— 库里一条记录都没有时，
+ * 时间边界和异常过滤的锚点都不存在，这时候去读 HC 会把一家人的数据无差别吞进来
+ * （`docs/08` §6.2）。所以必须先让用户记一条自己的体重。
+ */
+@Composable
+private fun healthConnectDescription(state: HealthConnectUi): String = when {
+    state.needsAnchor -> stringResource(R.string.settings_hc_needs_anchor)
+
+    state.availability == SyncAvailabilityUi.NOT_INSTALLED ->
+        stringResource(R.string.settings_hc_not_installed)
+
+    state.availability == SyncAvailabilityUi.NEEDS_UPDATE ->
+        stringResource(R.string.settings_hc_needs_update)
+
+    state.syncing -> stringResource(R.string.settings_hc_syncing)
+
+    !state.granted -> stringResource(R.string.settings_hc_needs_permission)
+
+    state.lastSyncAt != null -> stringResource(
+        R.string.settings_hc_synced,
+        state.lastSyncAt.formatShortDateTime(),
+        state.syncedCount,
+    )
+
+    else -> stringResource(R.string.settings_hc_ready)
 }

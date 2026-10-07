@@ -70,6 +70,9 @@ data class HomeUiState(
 
     /** 当前整屏。设置是**整屏**而不是弹窗 —— 入口在右上角，从下往上弹不呼应 */
     val screen: Screen = Screen.HOME,
+
+    /** 设置页「数据管理」里那一行的状态（`docs/08` §6） */
+    val healthConnect: HealthConnectUi = HealthConnectUi(),
 ) {
     /** 首页历史区默认展示条数（设计规范 §4.5：默认展示最近 2–3 条） */
     val historyLimit: Int get() = HOME_HISTORY_LIMIT
@@ -156,4 +159,62 @@ sealed interface HomeEvent {
     data object DataCleared : HomeEvent
     /** 读写出错（用户没选文件、文件不可读等） */
     data class DataFailed(val exporting: Boolean, val reason: String) : HomeEvent
+
+    // ── 体脂秤同步 ──
+
+    /**
+     * 同步完成。[inserted] 是真正新增的，[claimed] 是认领到已有手动记录上的
+     * （不新增行，所以单独报，不然用户会以为丢数据了），[skipped] 是被跳过的。
+     */
+    data class SyncFinished(
+        val inserted: Int,
+        val claimed: Int,
+        val skipped: Int,
+    ) : HomeEvent
+
+    data class SyncUnavailable(val availability: SyncAvailabilityUi) : HomeEvent
+    data object SyncPermissionDenied : HomeEvent
+    data class SyncFailed(val reason: String) : HomeEvent
 }
+
+/**
+ * 同步入口的可用状态。
+ *
+ * 这是 **UI 层的镜像**，不是 data 层的 `HealthConnectAvailability` ——
+ * Composable 不该认识 SDK 的类型（分层约定，见 AGENTS「架构约定」）。
+ * 由 ViewModel 做映射。
+ */
+enum class SyncAvailabilityUi {
+    /** API < 28：那一行**整行不显示**，否则用户会看到一个永远失败的按钮 */
+    UNSUPPORTED,
+
+    /** Android 9–13 且没装「健康数据共享」 */
+    NOT_INSTALLED,
+
+    /** 装了但版本太老 */
+    NEEDS_UPDATE,
+
+    AVAILABLE,
+}
+
+/**
+ * 设置页里体脂秤那一行的全部状态。
+ *
+ * 只放原始数据，文案由 Composable 组装（决策 C5）。
+ */
+data class HealthConnectUi(
+    val availability: SyncAvailabilityUi = SyncAvailabilityUi.UNSUPPORTED,
+    /** 体重与体脂率的读权限是否**都**已授予（HC 允许只授一半） */
+    val granted: Boolean = false,
+    val syncing: Boolean = false,
+    val lastSyncAt: Instant? = null,
+    /** 库里来自 Health Connect 的条数 */
+    val syncedCount: Int = 0,
+    /**
+     * 库里一条记录都没有 —— 首次接入必须先让用户手动记一条自己的体重。
+     *
+     * 那条记录同时是**时间边界的起点**和**异常过滤的锚点**：
+     * 没有它，第一次同步会把一家人的数据无差别吞进来（`docs/08` §6.2）。
+     */
+    val needsAnchor: Boolean = false,
+)
