@@ -12,21 +12,6 @@ import com.weightdiary.app.domain.sync.RawBodyFat
 import com.weightdiary.app.domain.sync.RawWeight
 import java.time.Instant
 
-/** Health Connect 在这台设备上的可用状态。UI 按它决定显示什么（见 `docs/08` §6.3） */
-enum class HealthConnectAvailability {
-    /** 能用 */
-    AVAILABLE,
-
-    /** 装了但版本太老，要用户去更新 */
-    NEEDS_UPDATE,
-
-    /** 没装。Android 9–13 需要用户自己从应用商店装一个 */
-    NOT_INSTALLED,
-
-    /** 系统版本不够：HC 要 API 28，本项目 minSdk 是 26（`docs/06` §2.2） */
-    UNSUPPORTED,
-}
-
 /** 一次拉取的原始记录。配对是 domain 层的事，这里只负责把 HC 的形状翻译成我们的形状 */
 data class PulledRawRecords(
     val weights: List<RawWeight>,
@@ -64,19 +49,11 @@ class HealthConnectSource(private val context: Context) {
         private const val MAX_PAGES = 20
     }
 
-    fun availability(): HealthConnectAvailability = when {
-        // 先自己卡版本：HC 要 API 28，而本项目的 minSdk 是 26
-        Build.VERSION.SDK_INT < 28 -> HealthConnectAvailability.UNSUPPORTED
-
-        HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE ->
-            HealthConnectAvailability.AVAILABLE
-
-        HealthConnectClient.getSdkStatus(context) ==
-            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
-            HealthConnectAvailability.NEEDS_UPDATE
-
-        else -> HealthConnectAvailability.NOT_INSTALLED
-    }
+    fun availability(): HealthConnectAvailability =
+        healthConnectAvailabilityFor(
+            sdkInt = Build.VERSION.SDK_INT,
+            sdkStatus = HealthConnectClient.getSdkStatus(context),
+        )
 
     suspend fun grantedPermissions(): Set<String> =
         HealthConnectClient.getOrCreate(context).permissionController.getGrantedPermissions()
