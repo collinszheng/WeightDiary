@@ -134,7 +134,13 @@ class HomeViewModel(
     fun onPermissionsResult(granted: Set<String>) {
         val ok = syncCoordinator.permissionsSatisfied(granted)
         syncGranted.value = ok
-        if (ok) syncNow()
+        if (ok) {
+            syncNow()
+        } else {
+            // 拒绝（或只授了一半）也必须给一句反馈。否则表现就是
+            // 「点了那一行，什么都没发生」—— 和 rationale Activity 那个坑长得一模一样
+            viewModelScope.launch { _events.send(HomeEvent.SyncPermissionDenied) }
+        }
     }
 
     fun syncNow() {
