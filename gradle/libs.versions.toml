@@ -9,6 +9,8 @@ composeBom = "2026.03.01"
 room = "2.8.5"
 datastore = "1.2.1"
 healthConnect = "1.1.0"
+androidxTestJunit = "1.3.0"
+androidxTestRunner = "1.7.0"
 coroutines = "1.10.2"
 junit = "4.13.2"
 
@@ -30,6 +32,10 @@ androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
+# androidTest（目前只有迁移测试）
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestJunit" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 

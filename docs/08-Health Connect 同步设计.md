@@ -249,7 +249,7 @@ CSV 导出/导入的 4 列表头**本期不动**，`RecordCsvTest` 的 14 个用
 
 ### 9.3 单测
 
-- 现有 130 个必须全绿；本次共 **+32 个**（合计 162）
+- 现有 130 个必须全绿；本次共 **+33 个**（合计 163）
 - `SyncPlanner`（19 个）：三层去重、时间边界、墓碑、邻近认领、范围与未来时间、
   异常过滤的**滚动锚点**（含「四步各 2kg、累计 8kg 不被误杀」的守门用例）
 - `MeasurementPairing`（6 个）：同日最近优先、一条体脂只能用一次、跨天不配
@@ -288,6 +288,28 @@ CSV 导出/导入的 4 列表头**本期不动**，`RecordCsvTest` 的 14 个用
 （*"data from the past 30 days"*），给 `06` §3 那条官方契约又添了一个独立佐证。
 
 ---
+
+### 9.6 迁移测试（自动化）
+
+`app/src/androidTest/java/com/weightdiary/app/data/local/WeightDatabaseMigrationTest.kt`，
+跑 `./gradlew connectedDebugAndroidTest`。
+
+在这之前，v1 → v2 只能手工覆盖安装验（`06` §7.4）—— 那种方法**测不出「哪些数据丢了」**，
+只能看出「应用崩没崩」，而且每加一版迁移都要重跑一遍。现在这个测试：
+
+1. 用 **v1 的 DDL**（逐字抄自 `app/schemas/.../1.json` 的 `createSql`）裸建一个真正的 v1 库
+2. 塞两条老记录，**一条带体脂、一条不带**（可空列最容易在迁移里出事）
+3. **用生产同样的配置打开** —— Room 会跑 `MIGRATION_1_2`，再拿生成的 identity hash 校验结构，
+   对不上就抛异常。所以「迁移写错了」由 Room 自己举报，**不需要手写结构断言**
+4. 再用 DAO 验数据、验墓碑表，以及**唯一索引的两个承重行为**：
+   `externalId` 撞了就插不进去、多个 `NULL` 可以共存
+
+**为什么不用 `androidx.room:room-testing` 的 `MigrationTestHelper`**：它会把
+`androidx.lifecycle:lifecycle-viewmodel-savedstate:2.10.0` 带的
+`kotlinx-serialization-core:1.7.3` 与 `room-migration:2.8.5` 要的 `1.8.1` 撞在一起
+（AGP 的 consistent resolution 把 app 侧的 1.7.3 作为 **strict** 约束复制进 androidTest 的
+classpath），运行时直接 `AbstractMethodError`。要修就得为一个测试去抬**生产**的依赖版本 ——
+而上面这条路验的是同一条真实路径，且零新增生产依赖。
 
 ## 10. 已知限制
 

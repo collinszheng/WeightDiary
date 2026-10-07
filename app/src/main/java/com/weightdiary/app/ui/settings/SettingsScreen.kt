@@ -186,6 +186,16 @@ fun SettingsScreen(
                 )
             }
 
+            // 换机即丢是纯本地方案的固有代价（决策 Q4），而导出是唯一的兜底。
+            // 但用户只会在丢了数据之后才意识到，所以这里常驻一句提醒。
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_data_hint),
+                style = typo.cardLabel,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+
             Spacer(Modifier.height(dimen.sectionGap))
 
             // ─────────── 关于 ───────────

@@ -1,5 +1,6 @@
 package com.weightdiary.app.domain.record
 
+import com.weightdiary.app.domain.model.RecordSource
 import com.weightdiary.app.domain.model.WeightRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -93,6 +94,26 @@ class RecordRowsTest {
             ),
         )
         assertEquals(0.0, rows[0].deltaKg!!, 1e-9)
+    }
+
+    @Test
+    fun `来源要原样带过去 - 列表靠它标出体脂秤同步来的行`() {
+        val manual = rec(1, "2026-06-28T08:00:00Z", 68.2)
+        val synced = WeightRecord(
+            id = 2,
+            measuredAt = Instant.parse("2026-06-29T08:00:00Z"),
+            weightKg = 68.5,
+            bodyFatPercent = null,
+            note = null,
+            createdAt = Instant.parse("2026-06-29T08:00:00Z"),
+            updatedAt = Instant.parse("2026-06-29T08:00:00Z"),
+            source = RecordSource.HEALTH_CONNECT,
+        )
+
+        val rows = RecordRows.build(listOf(synced, manual))
+
+        assertEquals(RecordSource.HEALTH_CONNECT, rows[0].source)
+        assertEquals(RecordSource.MANUAL, rows[1].source)
     }
 
     @Test

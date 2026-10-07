@@ -25,6 +25,8 @@ android {
         targetSdk = 36
         versionCode = 2
         versionName = appVersionName
+        // androidTest 只有一个迁移测试（见 src/androidTest）
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -103,6 +105,14 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    // androidTest 目前只有一个 Room 迁移测试。
+    // 刻意**不引入** androidx.room:room-testing：它的 MigrationTestHelper 会与
+    // lifecycle 带的 kotlinx-serialization-core:1.7.3 冲突（AGP consistent resolution
+    // 会把 app 侧版本作为 strict 约束复制过来），而修它要抬生产的依赖版本。
+    // 迁移测试改成「裸建 v1 库 + 用生产配置打开」，见 src/androidTest。
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }
 /**
  * 把正式包拷到项目根的 dist/，并起一个纯英文的名字。

@@ -34,7 +34,7 @@
     <string name="sheet_edit_profile_title">编辑个人资料</string>
     <string name="sheet_onboarding_title">先填一下身高</string>
     <string name="sheet_onboarding_desc">BMI 需要身高才能算出来。身高只存在这台设备上，不会上传。</string>
-    <string name="privacy_local_only">所有数据仅保存在本机</string>
+    <string name="privacy_local_only">数据只在本机处理，不会上传</string>
 
     <!-- 字段 -->
     <string name="field_datetime">日期时间</string>
@@ -91,6 +91,9 @@
     <string name="snack_record_deleted">已删除记录</string>
     <string name="snack_record_updated">已更新记录</string>
     <string name="cd_record_row">%1$s，%2$s</string>
+    <!-- 同步来的记录在列表右侧标一下来源；可见的是短符号，读屏要念全 -->
+    <string name="record_source_scale">体脂秤</string>
+    <string name="cd_record_source_scale">，来自体脂秤</string>
     <string name="cd_delete_record">删除这条记录</string>
 
     <!-- 空状态与无障碍 -->
@@ -127,13 +130,14 @@
     <string name="settings_import_desc">从 CSV 导入，记录会追加到现有数据之后</string>
     <string name="settings_clear">清空所有数据</string>
     <string name="settings_clear_desc">删除全部记录，不可恢复</string>
+    <string name="settings_data_hint">数据只在这台设备上，换手机或卸载重装都拿不回来 —— 建议定期导出备份</string>
     <string name="settings_clear_title">清空所有数据？</string>
     <string name="settings_clear_message">将删除全部 %1$d 条记录，此操作不可恢复。身高与目标设置不受影响。</string>
     <string name="action_clear">清空</string>
 
     <string name="settings_section_about">关于</string>
     <string name="about_version">版本 %1$s</string>
-    <string name="about_privacy">所有数据仅保存在本机</string>
+    <string name="about_privacy">数据只在本机处理。若系统开启了备份，备份可能包含本应用数据</string>
 
     <string name="snack_exported">已导出 %1$d 条记录</string>
     <string name="snack_export_empty">还没有记录可以导出</string>
@@ -171,6 +175,6 @@
       （见 PermissionsRationaleActivity 的注释），所以它不是为了应付审核。
     -->
     <string name="rationale_body">体重日记通过系统的「健康数据共享」读取你的体重与体脂率，用来画出趋势图。</string>
-    <string name="rationale_privacy">数据只在本机处理。这个 App 没有网络权限，不会上传任何内容。</string>
+    <string name="rationale_privacy">数据只在本机处理。这个 App 没有网络权限；若系统开启了备份，备份可能包含本应用数据。</string>
     <string name="rationale_dismiss">知道了</string>
 </resources>

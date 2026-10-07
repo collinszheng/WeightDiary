@@ -1,5 +1,6 @@
 package com.weightdiary.app.domain.record
 
+import com.weightdiary.app.domain.model.RecordSource
 import com.weightdiary.app.domain.model.WeightRecord
 import java.time.Instant
 
@@ -16,6 +17,11 @@ data class RecordRow(
     val bodyFatPercent: Double?,
     val note: String?,
     val deltaKg: Double?,
+    /**
+     * 来源。列表要标出哪些是体脂秤同步来的 —— 家庭共用一台秤时，
+     * 那是用户判断「这条是不是我的」的唯一线索。
+     */
+    val source: RecordSource = RecordSource.MANUAL,
 )
 
 object RecordRows {
@@ -36,6 +42,7 @@ object RecordRows {
                 bodyFatPercent = record.bodyFatPercent,
                 note = record.note,
                 deltaKg = earlier?.let { record.weightKg - it.weightKg },
+                source = record.source,
             )
         }
 }
