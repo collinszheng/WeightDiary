@@ -121,17 +121,17 @@
     <string name="settings_section_bmi">BMI 标准</string>
     <string name="bmi_standard_china">中国标准</string>
     <string name="bmi_standard_who">WHO</string>
-    <string name="settings_bmi_hint">标准决定「超重」的门槛：中国 24.0，WHO 25.0</string>
+    <string name="settings_bmi_hint">「超重」的判定阈值：中国标准 24.0，WHO 标准 25.0</string>
 
     <string name="settings_section_data">数据管理</string>
     <string name="settings_export">导出数据</string>
-    <string name="settings_export_desc">导出为 CSV，可用 Excel 打开</string>
+    <string name="settings_export_desc">导出为 CSV 文件，可用 Excel 打开</string>
     <string name="settings_import">导入数据</string>
-    <string name="settings_import_desc">从 CSV 导入，记录会追加到现有数据之后</string>
+    <string name="settings_import_desc">从 CSV 导入，记录将追加至现有数据之后</string>
     <string name="settings_clear">清空所有数据</string>
     <string name="settings_clear_desc">删除全部记录，不可恢复</string>
-    <string name="settings_data_hint">数据只在这台设备上，换手机或卸载重装都拿不回来 —— 建议定期导出备份</string>
-    <string name="settings_clear_title">清空所有数据？</string>
+    <string name="settings_data_hint">数据仅在本机处理，更换设备或卸载后无法恢复，建议定期导出备份</string>
+    <string name="settings_clear_title">确认清空所有数据？</string>
     <string name="settings_clear_message">将删除全部 %1$d 条记录，此操作不可恢复。身高与目标设置不受影响。</string>
     <string name="action_clear">清空</string>
 
@@ -141,10 +141,10 @@
 
     <string name="settings_section_about">关于</string>
     <string name="about_version">版本 %1$s</string>
-    <string name="about_privacy">数据只在本机处理。若系统开启了备份，备份可能包含本应用数据</string>
+    <string name="about_privacy">数据仅在本机处理。若系统已开启备份，备份内容可能包含本应用数据</string>
 
     <string name="snack_exported">已导出 %1$d 条记录</string>
-    <string name="snack_export_empty">还没有记录可以导出</string>
+    <string name="snack_export_empty">暂无可导出的记录</string>
     <string name="snack_imported">已导入 %1$d 条记录</string>
     <string name="snack_imported_partial">已导入 %1$d 条，跳过 %2$d 条无法解析的行</string>
     <string name="snack_cleared">已清空所有记录</string>
@@ -153,26 +153,26 @@
 
     <!-- 体脂秤同步（Health Connect）—— 走设备内 IPC，不联网 -->
     <string name="settings_health_connect">体脂秤同步</string>
-    <string name="settings_hc_experiment_hint">行为可能随版本变化。数据来自「健康数据共享」，需要体脂秤 App 自己把称重写进去；不是所有品牌的 App 都会写。</string>
-    <string name="settings_hc_needs_anchor">先记一条你自己的体重，再接入体脂秤</string>
-    <string name="settings_hc_not_installed">需要先安装「健康数据共享」</string>
+    <string name="settings_hc_experiment_hint">此功能为实验性质：通过「健康数据共享」读取数据，需要体脂秤应用能够将称重数据写入。部分品牌的应用未提供该能力。</string>
+    <string name="settings_hc_needs_anchor">请先手动记录一条体重，再接入体脂秤</string>
+    <string name="settings_hc_not_installed">需先安装「健康数据共享」</string>
     <string name="settings_hc_needs_update">「健康数据共享」需要更新</string>
-    <string name="settings_hc_needs_permission">读取体重与体脂率，不联网</string>
-    <string name="settings_hc_ready">点此读取体脂秤数据</string>
+    <string name="settings_hc_needs_permission">读取体重与体脂率，无需网络权限</string>
+    <string name="settings_hc_ready">点击读取体脂秤数据</string>
     <string name="settings_hc_syncing">正在同步…</string>
     <string name="settings_hc_synced">上次 %1$s · 已同步 %2$d 条</string>
 
     <string name="snack_sync_done">已同步 %1$d 条</string>
     <string name="snack_sync_done_skipped">已同步 %1$d 条，跳过 %2$d 条</string>
-    <string name="snack_sync_done_claimed">已同步 %1$d 条，%2$d 条并入了已有记录</string>
-    <string name="snack_sync_claimed_only">%1$d 条并入了已有记录，没有新增</string>
+    <string name="snack_sync_done_claimed">已同步 %1$d 条，另有 %2$d 条并入已有记录</string>
+    <string name="snack_sync_claimed_only">%1$d 条并入已有记录，无新增</string>
     <!-- 首次接入必然走到这条：引导记录的时间就是边界，之前的数据一律不收（docs/08 §6.4） -->
     <string name="snack_sync_start_fresh">已连接，将从现在开始记录新的称重</string>
     <string name="snack_sync_nothing">已连接，没有新的称重记录</string>
-    <string name="snack_sync_not_installed">这台设备上没有「健康数据共享」，请先从应用商店安装</string>
-    <string name="snack_sync_unsupported">这台设备的系统版本不支持体脂秤同步</string>
+    <string name="snack_sync_not_installed">本机未安装「健康数据共享」，请先从应用商店安装</string>
+    <string name="snack_sync_unsupported">当前系统版本不支持体脂秤同步</string>
     <string name="snack_sync_needs_update">「健康数据共享」需要更新后才能使用</string>
-    <string name="snack_sync_denied">没有拿到读取权限，无法同步</string>
+    <string name="snack_sync_denied">未获得读取权限，无法同步</string>
     <string name="snack_sync_failed">同步失败：%1$s</string>
 
     <!--
