@@ -1,5 +1,6 @@
 package com.weightdiary.app
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,6 +12,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.health.connect.client.PermissionController
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.Scaffold
@@ -29,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.weightdiary.app.data.healthconnect.HealthConnectSource
 import com.weightdiary.app.ui.common.format1
 import com.weightdiary.app.ui.home.ActiveSheet
 import com.weightdiary.app.ui.home.HomeEvent
@@ -37,6 +40,7 @@ import com.weightdiary.app.ui.home.HomeUiState
 import com.weightdiary.app.domain.record.RecordCsv
 import com.weightdiary.app.ui.home.HomeViewModel
 import com.weightdiary.app.ui.home.Screen
+import com.weightdiary.app.ui.home.SyncAvailabilityUi
 import com.weightdiary.app.ui.home.components.AddRecordFab
 import com.weightdiary.app.ui.sheet.AddRecordSheet
 import com.weightdiary.app.ui.sheet.AllRecordsSheet
@@ -67,6 +71,7 @@ class MainActivity : ComponentActivity() {
                     factory = HomeViewModel.factory(
                         container.weightRepository,
                         container.recordBackup,
+                        container.weightSyncCoordinator,
                     ),
                 )
                 val state by homeViewModel.uiState.collectAsStateWithLifecycle()
@@ -91,6 +96,12 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let(viewModel::importData) }
+
+    // Health Connect 的授权走它自己的系统弹窗，不是普通的运行时权限 ——
+    // 契约由 HC 客户端提供，返回的是「实际授予了哪些」，允许只授一半。
+    val permissionLauncher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract(),
+    ) { granted -> viewModel.onPermissionsResult(granted) }
 
     // 一次性事件 → Snackbar。用 Channel 而不是 StateFlow，旋转屏幕不会重放
     LaunchedEffect(viewModel) {
@@ -145,6 +156,28 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
                     } else {
                         context.getString(R.string.snack_import_failed, event.reason)
                     },
+                )
+
+                is HomeEvent.SyncFinished -> snackbarHostState.showSnackbar(
+                    syncMessage(context, event),
+                )
+
+                is HomeEvent.SyncUnavailable -> snackbarHostState.showSnackbar(
+                    context.getString(
+                        when (event.availability) {
+                            SyncAvailabilityUi.NOT_INSTALLED -> R.string.snack_sync_not_installed
+                            SyncAvailabilityUi.NEEDS_UPDATE -> R.string.snack_sync_needs_update
+                            else -> R.string.snack_sync_unsupported
+                        }
+                    ),
+                )
+
+                HomeEvent.SyncPermissionDenied -> snackbarHostState.showSnackbar(
+                    context.getString(R.string.snack_sync_denied),
+                )
+
+                is HomeEvent.SyncFailed -> snackbarHostState.showSnackbar(
+                    context.getString(R.string.snack_sync_failed, event.reason),
                 )
             }
         }
@@ -204,10 +237,24 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
                     bmiStandard = state.bmiStandard,
                     recordCount = state.recordCount,
                     versionName = BuildConfig.VERSION_NAME,
+                    healthConnect = state.healthConnect,
                     onBack = viewModel::closeSettings,
                     onBmiStandardChange = viewModel::setBmiStandard,
                     onExport = { exportLauncher.launch(defaultBackupFileName()) },
                     onImport = { importLauncher.launch(arrayOf("*/*")) },
+                    onHealthConnectClick = {
+                        when {
+                            // 库里一条记录都没有 → 先引导记一条自己的体重。
+                            // 那条记录同时是时间边界和异常过滤的锚点，跳过它就会
+                            // 无过滤地吞下一家人的数据（docs/08 §6.2）
+                            state.healthConnect.needsAnchor ->
+                                viewModel.openSheet(ActiveSheet.ADD_RECORD)
+
+                            state.healthConnect.granted -> viewModel.syncNow()
+
+                            else -> permissionLauncher.launch(HealthConnectSource.PERMISSIONS)
+                        }
+                    },
                     onClearData = viewModel::clearAllData,
                 )
             }
@@ -292,3 +339,29 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
  */
 private fun defaultBackupFileName(): String =
     "WeightDiary-" + DateTimeFormatter.ISO_LOCAL_DATE.format(LocalDate.now()) + ".csv"
+
+/**
+ * 同步结果的提示文案。
+ *
+ * 「一条都没进来」有好几种不同的原因，混成一个「已同步 0 条」用户只会以为坏了：
+ * - **首次接入必然走 [R.string.snack_sync_start_fresh]** —— 引导记录的时间就是时间边界，
+ *   它之前的数据一律不收（`docs/08` §6.4）。这是有意的，但必须说清楚
+ * - 全都**并入**了已有记录 → 要报出并了几条，否则用户以为数据丢了
+ * - 真的没有新数据
+ */
+private fun syncMessage(context: Context, event: HomeEvent.SyncFinished): String = when {
+    event.inserted > 0 && event.skipped > 0 ->
+        context.getString(R.string.snack_sync_done_skipped, event.inserted, event.skipped)
+
+    event.inserted > 0 && event.claimed > 0 ->
+        context.getString(R.string.snack_sync_done_claimed, event.inserted, event.claimed)
+
+    event.inserted > 0 -> context.getString(R.string.snack_sync_done, event.inserted)
+
+    event.claimed > 0 ->
+        context.getString(R.string.snack_sync_claimed_only, event.claimed)
+
+    event.skipped > 0 -> context.getString(R.string.snack_sync_start_fresh)
+
+    else -> context.getString(R.string.snack_sync_nothing)
+}

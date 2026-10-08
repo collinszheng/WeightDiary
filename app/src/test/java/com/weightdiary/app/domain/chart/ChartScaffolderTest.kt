@@ -1,6 +1,7 @@
 package com.weightdiary.app.domain.chart
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.DayOfWeek
@@ -309,6 +310,55 @@ class ChartScaffolderTest {
         val withTarget = ChartScaffolder.buildYAxis(listOf(66.0, 72.0), targetLine = 68.0)
         assertEquals(withoutTarget.lower, withTarget.lower, 1e-9)
         assertEquals(withoutTarget.upper, withTarget.upper, 1e-9)
+    }
+
+    // ─────────────── Y 轴：参照线可见性 ───────────────
+
+    @Test
+    fun `showsReferenceLine 只认严格落在窗口内部的线`() {
+        val axis = ChartScaffolder.buildYAxis(listOf(66.0, 72.0))
+        assertTrue(axis.showsReferenceLine((axis.lower + axis.upper) / 2))
+        // 压在上下边框上不算「看得见」—— 画上去会和坐标轴重合
+        assertFalse(axis.showsReferenceLine(axis.lower))
+        assertFalse(axis.showsReferenceLine(axis.upper))
+        assertFalse(axis.showsReferenceLine(axis.lower - 0.1))
+        assertFalse(axis.showsReferenceLine(axis.upper + 0.1))
+    }
+
+    /**
+     * 真机回归（小米 11 / HyperOS，2025-09），详见 [docs/07-真机测试清单.md §6.6]。
+     *
+     * 现场数据：本周只有一个绘图点 66.0，目标 65.0。
+     *
+     * 旧代码先算 `buildYAxis(values)`（**不含**目标）拿步长，再与含目标的比，
+     * 据此判「纳入目标要付代价」，于是坐标轴用了不含目标的那个 —— 而那个窗口
+     * 碰巧也把 65 包了进去。结果目标线不画，角标又按 `65 < lower` 判成「目标在上方」，
+     * 弹出「▲ 还需 1.0 kg」——**可用户实际要减 1.0 kg**。
+     *
+     * 修正后目标无条件纳入坐标轴（与上面「目标线无条件纳入范围」一致），
+     * 目标必然可见，角标只在极端跨度连兜底步长都撑不下时才轮到。
+     */
+    @Test
+    fun `真机回归 - 目标被旧判据挡掉其实它就在那个窗口里`() {
+        val withoutTarget = ChartScaffolder.buildYAxis(listOf(66.0))
+
+        // 旧代码用的就是这个「不含目标」的轴，而 65 恰好落在它里面 ——
+        // 正因如此「线不画」和「角标说在上方」才会同时出现、互相矛盾
+        assertTrue(
+            "65 本来就在不含目标的窗口 ${withoutTarget.lower}..${withoutTarget.upper} 内",
+            withoutTarget.showsReferenceLine(65.0),
+        )
+
+        val axis = ChartScaffolder.buildYAxis(listOf(66.0), targetLine = 65.0)
+        // 含目标的轴步长更小（窗口更紧），所以旧判据才认为「纳入要付代价」而放弃了它
+        assertTrue(
+            "含目标步长 ${axis.majorStep} 应小于不含目标的 ${withoutTarget.majorStep}",
+            axis.majorStep < withoutTarget.majorStep,
+        )
+        assertTrue(
+            "目标 65 必须落在窗口 ${axis.lower}..${axis.upper} 内",
+            axis.showsReferenceLine(65.0),
+        )
     }
 
     // ─────────────── Y 轴：退化 ───────────────

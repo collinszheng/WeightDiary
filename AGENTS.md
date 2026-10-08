@@ -51,7 +51,8 @@
 
 ```bash
 ./gradlew assembleDebug        # 构建
-./gradlew testDebugUnitTest    # 单测（130 个，改代码后必须全绿）
+./gradlew testDebugUnitTest    # 单测（163 个，改代码后必须全绿）
+./gradlew connectedDebugAndroidTest   # 设备上的 Room 迁移测试（要模拟器/真机）
 ./gradlew distRelease          # 正式签名包 → dist/WeightDiary-<版本>.apk
 ```
 

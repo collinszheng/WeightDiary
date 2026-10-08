@@ -2,9 +2,12 @@ package com.weightdiary.app.di
 
 import android.content.Context
 import com.weightdiary.app.data.backup.RecordBackup
+import com.weightdiary.app.data.healthconnect.HealthConnectSource
 import com.weightdiary.app.data.local.WeightDatabase
 import com.weightdiary.app.data.prefs.ProfileStore
+import com.weightdiary.app.data.prefs.SyncStore
 import com.weightdiary.app.data.repository.WeightRepository
+import com.weightdiary.app.data.sync.WeightSyncCoordinator
 
 /**
  * 手写依赖容器。
@@ -20,9 +23,17 @@ class AppContainer(context: Context) {
 
     val profileStore: ProfileStore by lazy { ProfileStore(appContext) }
 
+    val syncStore: SyncStore by lazy { SyncStore(appContext) }
+
     val weightRepository: WeightRepository by lazy {
-        WeightRepository(database.weightDao(), profileStore)
+        WeightRepository(database, profileStore, syncStore)
     }
 
     val recordBackup: RecordBackup by lazy { RecordBackup(appContext) }
+
+    val healthConnectSource: HealthConnectSource by lazy { HealthConnectSource(appContext) }
+
+    val weightSyncCoordinator: WeightSyncCoordinator by lazy {
+        WeightSyncCoordinator(weightRepository, syncStore, healthConnectSource)
+    }
 }

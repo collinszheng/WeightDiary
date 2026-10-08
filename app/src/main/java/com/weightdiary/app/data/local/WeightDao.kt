@@ -2,6 +2,7 @@ package com.weightdiary.app.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
@@ -51,4 +52,40 @@ interface WeightDao {
 
     @Query("SELECT * FROM weight_records ORDER BY measuredAt ASC")
     suspend fun getAllOnce(): List<WeightRecordEntity>
+
+    // ─────────────── Health Connect 同步 ───────────────
+
+    @Query("SELECT * FROM weight_records WHERE externalId = :externalId LIMIT 1")
+    suspend fun findByExternalId(externalId: String): WeightRecordEntity?
+
+    /** 去重要用的已知外部 id 集合（手动记录的 NULL 不在其中） */
+    @Query("SELECT externalId FROM weight_records WHERE externalId IS NOT NULL")
+    suspend fun allExternalIds(): List<String>
+
+    /**
+     * 批量插入，撞唯一索引就跳过。
+     *
+     * 同步路径用它而不是 [insertAll]：即使去重算漏了一条，
+     * 唯一索引这道兜底也不会让同步整体失败。
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIgnore(entities: List<WeightRecordEntity>): List<Long>
+
+    /** 「邻近认领」：把外部 id 挂到一条已有的手动记录上，不新增行 */
+    @Query(
+        "UPDATE weight_records SET externalId = :externalId, updatedAt = :updatedAt " +
+            "WHERE id = :id"
+    )
+    suspend fun attachExternalId(id: Long, externalId: String, updatedAt: Long)
+
+    // ─────────────── 墓碑 ───────────────
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIgnored(entity: IgnoredExternalIdEntity)
+
+    @Query("SELECT externalId FROM ignored_external_ids")
+    suspend fun allIgnoredIds(): List<String>
+
+    @Query("DELETE FROM ignored_external_ids")
+    suspend fun clearIgnored()
 }

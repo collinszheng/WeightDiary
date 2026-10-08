@@ -34,6 +34,7 @@ object ReferenceLines {
 
         return BmiClassifier.thresholds(standard)
             .map { ReferenceLine(value = it.bmi * heightSquared, opensLevel = it.opensLevel) }
-            .filter { it.value > axis.lower && it.value < axis.upper }
+            // 与目标线共用同一个可见性判据，见 YAxis.showsReferenceLine
+            .filter { axis.showsReferenceLine(it.value) }
     }
 }

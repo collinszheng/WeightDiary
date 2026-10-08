@@ -17,4 +17,9 @@ data class WeightRecord(
     val note: String? = null,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
+    /**
+     * 来源。**这里刻意没有 `externalId`** —— 那是持久层的去重键，
+     * domain 不需要知道它（见 `docs/08` §3.3）。
+     */
+    val source: RecordSource = RecordSource.MANUAL,
 )

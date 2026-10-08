@@ -1,6 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+      体脂秤同步走 Health Connect，设备内 IPC、只读体重与体脂率。
+
+      刻意**没有 INTERNET** —— 那是本项目最硬的卖点（docs/06 §2.1），
+      也是所有接入方案的选型第一判据。
+
+      下面两条权限名不是凭记忆写的：是从 connect-client 1.1.0 的 AAR 里
+      提取确认的。它们必须与 HealthConnectSource.PERMISSIONS 里
+      HealthPermission.getReadPermission() 推导出来的结果一致，否则会静默失效。
+
+      不声明 READ_HEALTH_DATA_HISTORY：突破 30 天要走 Play 审批，对体重 App 不划算
+      （docs/08 §5）。
+    -->
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" />
+
+    <!--
+      API 30+ 的包可见性。不声明这一条就看不见「健康数据共享」装没装，
+      可用性判断会一直返回 NOT_INSTALLED，那个入口就永远是死的。
+    -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
+
     <application
         android:name=".WeightDiaryApp"
         android:allowBackup="true"
@@ -23,6 +47,41 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          Health Connect 的权限说明页。
+
+          ⚠️ **这个 intent-filter 缺了，HC 的授权弹窗根本不会弹** ——
+          HC 在弹授权页之前会解析 ACTION_SHOW_PERMISSIONS_RATIONALE，
+          解析不到就 finish()，用户看到的现象是「点了那一行什么也没发生」。
+          （实跑时 HC 的日志：`E PermissionsActivity: App should support rationale intent, finishing!`）
+
+          两个 action 都是从实机提取核实过的：
+          - androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE ← HC 控制器 dex
+          - VIEW_PERMISSION_USAGE / HEALTH_PERMISSIONS / START_VIEW_PERMISSION_USAGE
+            ← HC dex + 平台 android.jar 的 Manifest.permission
+        -->
+        <activity
+            android:name=".ui.health.PermissionsRationaleActivity"
+            android:exported="true"
+            android:label="@string/settings_health_connect"
+            android:theme="@style/Theme.WeightDiary">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+
+        <!-- 系统「权限使用情况」页跳回本 App 的入口 -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".ui.health.PermissionsRationaleActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
     </application>
 
 </manifest>

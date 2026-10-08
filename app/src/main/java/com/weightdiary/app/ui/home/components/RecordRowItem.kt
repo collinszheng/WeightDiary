@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
+import com.weightdiary.app.domain.model.RecordSource
 import com.weightdiary.app.domain.record.RecordRow
 import com.weightdiary.app.ui.common.format1
 import com.weightdiary.app.ui.common.TimeLabel
@@ -60,18 +61,34 @@ fun RecordRowItem(
     val colors = WeightDiaryTheme.colors
     val typo = WeightDiaryTheme.typography
 
-    val timeText = row.measuredAt.toTimeLabel().asText()
+    val synced = row.source == RecordSource.HEALTH_CONNECT
+
+    // 时间标签：**可见文本**与**朗读文本**要分开。
+    // 可见的那份用 `· 体脂秤` 这种短符号（列表右侧空间有限），
+    // 读屏的那份要念全（「来自体脂秤」），所以不能共用同一个字符串。
+    val timeLabel = row.measuredAt.toTimeLabel().asText()
+    val displayTime = if (synced) {
+        timeLabel + " · " + stringResource(R.string.record_source_scale)
+    } else {
+        timeLabel
+    }
+
     val weightText = row.weightKg.format1()
     // 体脂是可见文本，读屏描述里也要带上 —— 否则 Row 上的 contentDescription
     // 会把子元素的文字整个盖掉，读屏用户永远听不到体脂
-    val description = row.bodyFatPercent?.let { fat ->
+    val baseDescription = row.bodyFatPercent?.let { fat ->
         stringResource(
             R.string.cd_record_row_with_fat,
             weightText,
             fat.format1(),
-            timeText,
+            timeLabel,
         )
-    } ?: stringResource(R.string.cd_record_row, "$weightText kg", timeText)
+    } ?: stringResource(R.string.cd_record_row, "$weightText kg", timeLabel)
+    val description = if (synced) {
+        baseDescription + stringResource(R.string.cd_record_source_scale)
+    } else {
+        baseDescription
+    }
 
     Row(
         modifier = modifier
@@ -131,7 +148,7 @@ fun RecordRowItem(
         }
 
         Text(
-            text = timeText,
+            text = displayTime,
             style = typo.caption,
             color = colors.textSecondary,
             maxLines = 1,

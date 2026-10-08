@@ -45,6 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.model.BmiStandard
+import com.weightdiary.app.ui.common.formatShortDateTime
+import com.weightdiary.app.ui.home.HealthConnectUi
+import com.weightdiary.app.ui.home.SyncAvailabilityUi
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
 /**
@@ -62,10 +65,12 @@ fun SettingsScreen(
     bmiStandard: BmiStandard,
     recordCount: Int,
     versionName: String,
+    healthConnect: HealthConnectUi,
     onBack: () -> Unit,
     onBmiStandardChange: (BmiStandard) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
+    onHealthConnectClick: () -> Unit,
     onClearData: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -168,6 +173,46 @@ fun SettingsScreen(
                     description = stringResource(R.string.settings_clear_desc),
                     onClick = { confirmingClear = true },
                     danger = true,
+                )
+            }
+
+            // 换机即丢是纯本地方案的固有代价（决策 Q4），而导出是唯一的兜底。
+            // 但用户只会在丢了数据之后才意识到，所以这里常驻一句提醒。
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_data_hint),
+                style = typo.cardLabel,
+                color = colors.textSecondary,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+
+            // ─────────── 实验功能 ───────────
+            //
+            // 体脂秤同步从「数据管理」挪到这里，并配一句说明。理由：它能不能用
+            // **取决于第三方 App 愿不愿意往 HC 写**，不是本 App 的能力 ——
+            // 小米官方那个 App 就不写（实测）。混在「数据管理」里会让人以为这是
+            // 自带功能，用不了时只会觉得是坏的。
+            //
+            // API < 28 时**整节不出现**（连标题一起）：宁可功能不出现，也不能留一张
+            // 空卡片配一句「此功能不支持」（docs/06 §2.2）
+            if (healthConnect.availability != SyncAvailabilityUi.UNSUPPORTED) {
+                Spacer(Modifier.height(dimen.sectionGap))
+
+                SectionLabel(stringResource(R.string.settings_section_experimental))
+                SettingsGroup {
+                    SettingsRow(
+                        title = stringResource(R.string.settings_health_connect),
+                        description = healthConnectDescription(healthConnect),
+                        onClick = onHealthConnectClick,
+                    )
+                }
+
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.settings_hc_experiment_hint),
+                    style = typo.cardLabel,
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(start = 4.dp),
                 )
             }
 
@@ -403,4 +448,34 @@ private fun BmiStandardSelector(
             }
         }
     }
+}
+
+/**
+ * 体脂秤那一行的说明文字。
+ *
+ * 顺序有讲究：**首次接入的引导排在所有状态之前** —— 库里一条记录都没有时，
+ * 时间边界和异常过滤的锚点都不存在，这时候去读 HC 会把一家人的数据无差别吞进来
+ * （`docs/08` §6.2）。所以必须先让用户记一条自己的体重。
+ */
+@Composable
+private fun healthConnectDescription(state: HealthConnectUi): String = when {
+    state.needsAnchor -> stringResource(R.string.settings_hc_needs_anchor)
+
+    state.availability == SyncAvailabilityUi.NOT_INSTALLED ->
+        stringResource(R.string.settings_hc_not_installed)
+
+    state.availability == SyncAvailabilityUi.NEEDS_UPDATE ->
+        stringResource(R.string.settings_hc_needs_update)
+
+    state.syncing -> stringResource(R.string.settings_hc_syncing)
+
+    !state.granted -> stringResource(R.string.settings_hc_needs_permission)
+
+    state.lastSyncAt != null -> stringResource(
+        R.string.settings_hc_synced,
+        state.lastSyncAt.formatShortDateTime(),
+        state.syncedCount,
+    )
+
+    else -> stringResource(R.string.settings_hc_ready)
 }
