@@ -31,8 +31,9 @@ plugins {
  *
  * ```
  * 1.0        code 1   （已发布）
- * 1.1-beta   code 2   ← 现在
- * 1.1 正式   code 3   ← 出正式版时把下面这个数字改成 3
+ * 1.1-beta   code 2   （已发布为 pre-release）
+ * 1.1 正式   code 3   ← 当前
+ * 1.2-beta   code 4   ← 下一轮从这里继续
  * ```
  *
  * code 相等是允许的（签名一致即可），只是没有「更新」信号；而本项目走 GitHub Releases
@@ -40,7 +41,7 @@ plugins {
  */
 val versionSuffix: String = providers.gradleProperty("versionSuffix").orNull.orEmpty()
 val appVersionName = "1.1" + versionSuffix
-val appVersionCode = 2
+val appVersionCode = 3
 
 android {
     namespace = "com.weightdiary.app"
