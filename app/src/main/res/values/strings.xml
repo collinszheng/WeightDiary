@@ -33,7 +33,7 @@
     <string name="sheet_add_title">添加数据</string>
     <string name="sheet_edit_profile_title">编辑个人资料</string>
     <string name="sheet_onboarding_title">先填一下身高</string>
-    <string name="sheet_onboarding_desc">BMI 需要身高才能算出来。身高只存在这台设备上，不会上传。</string>
+    <string name="sheet_onboarding_desc">BMI 需要身高才能算出来。身高只在本机处理，不会上传。</string>
     <string name="privacy_local_only">数据只在本机处理，不会上传</string>
 
     <!-- 字段 -->
