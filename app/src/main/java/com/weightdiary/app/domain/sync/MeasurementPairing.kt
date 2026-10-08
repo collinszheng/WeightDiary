@@ -25,32 +25,52 @@ object MeasurementPairing {
         bodyFats: List<RawBodyFat>,
         zone: ZoneId,
     ): Result {
-        // 同一天的体脂率按时间排好队，挨个被认领，每条最多用一次
-        val byDay = bodyFats
-            .groupBy { it.measuredAt.atZone(zone).toLocalDate() }
-            .mapValues { (_, list) -> list.sortedBy { it.measuredAt }.toMutableList() }
+        // 配对是**全局按时间差升序**的贪心，而不是「按体重的时间顺序、各取离自己最近的」。
+        //
+        // 后者是先到先得：先被处理的（更早的）体重会抢走其实离**后面**某条更近的体脂。
+        // 真机上踩到过 —— 体脂秤把体重与体脂率写在**同一时刻**（这是常态），
+        // 结果体脂被 2 分钟前的那条体重抢走，用户看到体脂挂在了错的那一行。
+        // 见 docs/07-真机测试清单.md §6.15
+        val weightDays = weights.map { it.measuredAt.atZone(zone).toLocalDate() }
+        val fatDays = bodyFats.map { it.measuredAt.atZone(zone).toLocalDate() }
 
-        var unpaired = bodyFats.size
+        // 同一天的所有 (体重, 体脂) 组合，按时间差升序 —— 最近的一对先认领
+        val candidates = buildList {
+            for (wi in weights.indices) {
+                for (fi in bodyFats.indices) {
+                    if (weightDays[wi] != fatDays[fi]) continue
+                    add(
+                        Triple(
+                            wi,
+                            fi,
+                            Duration.between(bodyFats[fi].measuredAt, weights[wi].measuredAt).abs(),
+                        ),
+                    )
+                }
+            }
+        }.sortedBy { it.third }
 
-        val measurements = weights.sortedBy { it.measuredAt }.map { weight ->
-            // 用 `?: mutableListOf()` 而不是 `orEmpty()`：后者会把 MutableList 退化成 List，
-            // 后面就没法把已认领的那条移出队列了
-            val candidates = byDay[weight.measuredAt.atZone(zone).toLocalDate()] ?: mutableListOf()
-            val nearest = candidates.minByOrNull {
-                Duration.between(it.measuredAt, weight.measuredAt).abs()
-            }
-            if (nearest != null) {
-                candidates.remove(nearest)
-                unpaired--
-            }
-            PulledMeasurement(
-                externalId = weight.externalId,
-                measuredAt = weight.measuredAt,
-                weightKg = weight.weightKg,
-                bodyFatPercent = nearest?.percent,
-            )
+        val fatOfWeight = HashMap<Int, RawBodyFat>()
+        val usedFat = HashSet<Int>()
+        for ((wi, fi, _) in candidates) {
+            // 一条体脂只能被用一次，否则会把一次体成分摊到两次称重上
+            if (fatOfWeight.containsKey(wi) || fi in usedFat) continue
+            fatOfWeight[wi] = bodyFats[fi]
+            usedFat += fi
         }
 
-        return Result(measurements, unpaired)
+        val measurements = weights.indices
+            .sortedBy { weights[it].measuredAt }
+            .map { wi ->
+                val weight = weights[wi]
+                PulledMeasurement(
+                    externalId = weight.externalId,
+                    measuredAt = weight.measuredAt,
+                    weightKg = weight.weightKg,
+                    bodyFatPercent = fatOfWeight[wi]?.percent,
+                )
+            }
+
+        return Result(measurements, bodyFats.size - usedFat.size)
     }
 }

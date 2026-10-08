@@ -45,8 +45,39 @@ class MeasurementPairingTest {
         )
 
         assertEquals(2, result.measurements.size)
-        assertEquals(22.5, result.measurements[0].bodyFatPercent!!, 1e-9)
-        assertNull(result.measurements[1].bodyFatPercent)
+        // 07:48 离 w2(07:50) 2 分钟、离 w1(07:45) 3 分钟 —— 全局最近的那条拿。
+        // （旧实现按体重时间升序先到先得，会把它给 w1；那是错的，见下面那条真机回归）
+        assertNull(result.measurements[0].bodyFatPercent)
+        assertEquals(22.5, result.measurements[1].bodyFatPercent!!, 1e-9)
+        assertEquals(0, result.unpairedBodyFat)
+    }
+
+    /**
+     * 真机回归（小米 11 / HyperOS，2025-09-08），详见 [docs/07-真机测试清单.md §6.15]。
+     *
+     * 体脂秤把体重与体脂率写在**同一时刻**（这是常态）。旧实现按体重的时间升序、
+     * 各自抢「离自己最近的」，于是先被处理的 68.0（02:55）抢走了本该属于
+     * 67.8（02:57，与体脂**同刻**）的体脂 —— 用户看到体脂挂在了错的那一行。
+     */
+    @Test
+    fun `真机回归 - 体脂落在同一时刻的体重上而不是更早的那条`() {
+        val result = MeasurementPairing.pair(
+            weights = listOf(
+                weight("2026-09-08T02:55:00+08:00", 68.0, "w-0255"),
+                weight("2026-09-08T02:57:00+08:00", 67.8, "w-0257"),
+            ),
+            bodyFats = listOf(fat("2026-09-08T02:57:00+08:00", 20.5, "f-0257")),
+            zone = zone,
+        )
+
+        val byId = result.measurements.associateBy { it.externalId }
+        assertEquals(
+            "体脂必须落在同一时刻的那条 67.8 上",
+            20.5,
+            byId.getValue("w-0257").bodyFatPercent!!,
+            1e-9,
+        )
+        assertNull("更早的 68.0 不该拿到它", byId.getValue("w-0255").bodyFatPercent)
         assertEquals(0, result.unpairedBodyFat)
     }
 
