@@ -30,7 +30,7 @@ object MeasurementPairing {
         // 后者是先到先得：先被处理的（更早的）体重会抢走其实离**后面**某条更近的体脂。
         // 真机上踩到过 —— 体脂秤把体重与体脂率写在**同一时刻**（这是常态），
         // 结果体脂被 2 分钟前的那条体重抢走，用户看到体脂挂在了错的那一行。
-        // 见 docs/07-真机测试清单.md §6.15
+        // 见 docs/09-真机实测记录.md §6.15
         val weightDays = weights.map { it.measuredAt.atZone(zone).toLocalDate() }
         val fatDays = bodyFats.map { it.measuredAt.atZone(zone).toLocalDate() }
 

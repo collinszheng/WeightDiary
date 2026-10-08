@@ -514,7 +514,7 @@ private fun buildChart(
     // 还让角标在自相矛盾的状态下弹出：真机上目标 65 落在窗口 [64, 70] 内，
     // 线却因 targetFits=false 不画，角标又按 `65 < 64` 判成「在上方」，
     // 于是显示「▲ 还需 1.0 kg」—— 而用户实际要**减** 1.0 kg。
-    // 见 docs/07-真机测试清单.md §6.6
+    // 见 docs/09-真机实测记录.md §6.6
     val axis = ChartScaffolder.buildYAxis(values, target)
 
     // 画线还是出角标，以目标在不在**最终窗口**里为准，与 BMI 阈值线共用同一个判据。
