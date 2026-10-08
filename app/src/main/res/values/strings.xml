@@ -135,6 +135,10 @@
     <string name="settings_clear_message">将删除全部 %1$d 条记录，此操作不可恢复。身高与目标设置不受影响。</string>
     <string name="action_clear">清空</string>
 
+    <!-- 实验功能：目前只有体脂秤同步。它的可用性取决于**第三方 App 是否往 HC 写**，
+         不是本 App 能控制的事 —— 所以不放在「数据管理」里假装是自带能力。 -->
+    <string name="settings_section_experimental">实验功能</string>
+
     <string name="settings_section_about">关于</string>
     <string name="about_version">版本 %1$s</string>
     <string name="about_privacy">数据只在本机处理。若系统开启了备份，备份可能包含本应用数据</string>
@@ -149,6 +153,7 @@
 
     <!-- 体脂秤同步（Health Connect）—— 走设备内 IPC，不联网 -->
     <string name="settings_health_connect">体脂秤同步</string>
+    <string name="settings_hc_experiment_hint">行为可能随版本变化。数据来自「健康数据共享」，需要体脂秤 App 自己把称重写进去；不是所有品牌的 App 都会写。</string>
     <string name="settings_hc_needs_anchor">先记一条你自己的体重，再接入体脂秤</string>
     <string name="settings_hc_not_installed">需要先安装「健康数据共享」</string>
     <string name="settings_hc_needs_update">「健康数据共享」需要更新</string>

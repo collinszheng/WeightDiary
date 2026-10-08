@@ -167,16 +167,6 @@ fun SettingsScreen(
                     description = stringResource(R.string.settings_import_desc),
                     onClick = onImport,
                 )
-                // 体脂秤同步。API < 28 时**整行不显示** —— 宁可功能不出现，
-                // 也不能画一个永远可点、永远失败的按钮（docs/06 §2.2）
-                if (healthConnect.availability != SyncAvailabilityUi.UNSUPPORTED) {
-                    GroupDivider()
-                    SettingsRow(
-                        title = stringResource(R.string.settings_health_connect),
-                        description = healthConnectDescription(healthConnect),
-                        onClick = onHealthConnectClick,
-                    )
-                }
                 GroupDivider()
                 SettingsRow(
                     title = stringResource(R.string.settings_clear),
@@ -195,6 +185,36 @@ fun SettingsScreen(
                 color = colors.textSecondary,
                 modifier = Modifier.padding(start = 4.dp),
             )
+
+            // ─────────── 实验功能 ───────────
+            //
+            // 体脂秤同步从「数据管理」挪到这里，并配一句说明。理由：它能不能用
+            // **取决于第三方 App 愿不愿意往 HC 写**，不是本 App 的能力 ——
+            // 小米官方那个 App 就不写（实测）。混在「数据管理」里会让人以为这是
+            // 自带功能，用不了时只会觉得是坏的。
+            //
+            // API < 28 时**整节不出现**（连标题一起）：宁可功能不出现，也不能留一张
+            // 空卡片配一句「此功能不支持」（docs/06 §2.2）
+            if (healthConnect.availability != SyncAvailabilityUi.UNSUPPORTED) {
+                Spacer(Modifier.height(dimen.sectionGap))
+
+                SectionLabel(stringResource(R.string.settings_section_experimental))
+                SettingsGroup {
+                    SettingsRow(
+                        title = stringResource(R.string.settings_health_connect),
+                        description = healthConnectDescription(healthConnect),
+                        onClick = onHealthConnectClick,
+                    )
+                }
+
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.settings_hc_experiment_hint),
+                    style = typo.cardLabel,
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
 
             Spacer(Modifier.height(dimen.sectionGap))
 
