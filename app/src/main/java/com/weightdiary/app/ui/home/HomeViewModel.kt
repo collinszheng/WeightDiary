@@ -503,27 +503,38 @@ private fun buildChart(
 
     val target = profile.targetWeightKg?.takeIf { it > 0.0 }
 
-    // ── 目标线：只在「纳入它不会把主步长顶大」时才画进坐标轴 ──
+    // ── 目标线：**无条件纳入坐标轴** ──
     //
-    // 窗口宽度永远是 3 × 主步长。目标离数据远时，纳入它会让步长从 1 跳到 3，
-    // 窗口从 3 个单位涨到 9 个，折线振幅从 47% 掉到 16%。所以判据不是
-    // 「目标在不在射程内」，而是「纳入它要不要付代价」——步长不变就是免费。
-    val stepWithoutTarget = ChartScaffolder.buildYAxis(values).majorStep
-    val targetFits = target != null &&
-        ChartScaffolder.buildYAxis(values, target).majorStep == stepWithoutTarget
+    // 产品要求目标线必须看得见，`ChartScaffolder` 也是按这个实现的（那边有单测
+    // 「目标线无条件纳入范围 - 哪怕离数据很远」守着）。代价是目标离数据很远时
+    // 折线会被压扁 —— 这是刻意用「看得见目标」换「看趋势」。
+    //
+    // ⚠️ 这里曾经还有个 targetFits 例外（「纳入目标会不会把主步长顶大」才画），
+    // 那是决策 B8「30% 撑开限制」的遗留、早已作废。它不但把废止的例外偷偷加了回来，
+    // 还让角标在自相矛盾的状态下弹出：真机上目标 65 落在窗口 [64, 70] 内，
+    // 线却因 targetFits=false 不画，角标又按 `65 < 64` 判成「在上方」，
+    // 于是显示「▲ 还需 1.0 kg」—— 而用户实际要**减** 1.0 kg。
+    // 见 docs/07-真机测试清单.md §6.6
+    val axis = ChartScaffolder.buildYAxis(values, target)
 
-    val axis = ChartScaffolder.buildYAxis(values, if (targetFits) target else null)
+    // 画线还是出角标，以目标在不在**最终窗口**里为准，与 BMI 阈值线共用同一个判据。
+    // 目标无条件纳入后，正常情况必然可见；只有极端跨度触发步长兜底（窗口撑不下）时
+    // 才轮得到角标，那时它才真的在报「线在图外」。
+    val targetVisible = target != null && axis.showsReferenceLine(target)
 
     return base.copy(
         yAxis = axis,
-        goalLine = target?.takeIf { targetFits },
-        goalOffscreen = target?.takeIf { !targetFits }?.let {
+        goalLine = if (targetVisible) target else null,
+        goalOffscreen = if (target != null && !targetVisible) {
             GoalOffscreen(
-                targetKg = it,
+                targetKg = target,
                 // 拿最后一个绘图点比，而不是最新那条记录 —— 图上看到的是前者
-                gapKg = points.last().value - it,
-                below = it < axis.lower,
+                gapKg = points.last().value - target,
+                // 走到这里目标必在窗口之外，所以 <= lower 就是「在下方」
+                below = target <= axis.lower,
             )
+        } else {
+            null
         },
         referenceLines = ReferenceLines.visibleIn(axis, heightCm, profile.bmiStandard),
     )

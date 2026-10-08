@@ -37,6 +37,16 @@ data class YAxis(
 
     fun normalize(value: Double): Double =
         if (upper - lower == 0.0) 0.5 else ((value - lower) / (upper - lower)).coerceIn(0.0, 1.0)
+
+    /**
+     * 这条水平参照线落在这个窗口里吗（严格内部，免得压在上下边框上）。
+     *
+     * **目标线与 BMI 阈值线必须共用这一个判据。** 从前目标线用的是另一套
+     * （「纳入目标会不会把主步长顶大」），两者会在真机上打架：目标 65 明明落在
+     * 窗口 [64, 70] 内，线却不画，还弹出一个方向说反的角标。
+     * 详见 [docs/07-真机测试清单.md §6.6]。
+     */
+    fun showsReferenceLine(value: Double): Boolean = value > lower && value < upper
 }
 
 object ChartScaffolder {
