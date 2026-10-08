@@ -34,7 +34,7 @@
 | 图表刻度对比 | [`assets/chart-ticks.png`](assets/chart-ticks.png) | 4 / 7 / 13 条刻度线的取舍过程 |
 | 折线平滑对比 | [`assets/chart-smooth.png`](assets/chart-smooth.png) | 直线段 / 全程平滑 / 分段平滑的取舍过程 |
 
-真机截图在 [`screenshots/`](screenshots/)，供仓库首页展示。
+截图留档在 [`screenshots/`](screenshots/)，供设计比对；**仓库首页已不再展示截图**。
 
 ## 环境基线
 
