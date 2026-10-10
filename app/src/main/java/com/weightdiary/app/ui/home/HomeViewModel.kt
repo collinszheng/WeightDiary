@@ -359,8 +359,14 @@ class HomeViewModel(
         viewModelScope.launch { refreshSyncStatus() }
     }
 
-    fun closeSettings() {
-        screen.value = Screen.HOME
+    /** 进设置主页里的某一页。传整屏枚举而不是写四个函数：接线处一眼看得出去了哪一页 */
+    fun openSettingsPage(page: Screen) {
+        screen.value = page
+    }
+
+    /** 返回上一级。规则在 [backTarget] 里，这里只管照着走 */
+    fun goBack() {
+        screen.value = backTarget(screen.value)
     }
 
     fun setBmiStandard(standard: BmiStandard) {

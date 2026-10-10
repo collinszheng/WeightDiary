@@ -44,11 +44,16 @@ import com.weightdiary.app.ui.home.HomeViewModel
 import com.weightdiary.app.ui.home.Screen
 import com.weightdiary.app.ui.home.SyncAvailabilityUi
 import com.weightdiary.app.ui.home.SyncRowAction
+import com.weightdiary.app.ui.home.screenDepth
 import com.weightdiary.app.ui.home.syncRowAction
 import com.weightdiary.app.ui.home.components.AddRecordFab
 import com.weightdiary.app.ui.sheet.AddRecordSheet
 import com.weightdiary.app.ui.sheet.AllRecordsSheet
 import com.weightdiary.app.ui.sheet.EditProfileSheet
+import com.weightdiary.app.ui.settings.AboutPage
+import com.weightdiary.app.ui.settings.BmiStandardPage
+import com.weightdiary.app.ui.settings.DataManagementPage
+import com.weightdiary.app.ui.settings.ExperimentalPage
 import com.weightdiary.app.ui.settings.SettingsScreen
 import com.weightdiary.app.ui.sheet.OnboardingSheet
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
@@ -187,8 +192,8 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
         }
     }
 
-    // 设置页按系统返回键应当回到首页，而不是退出 App
-    BackHandler(enabled = state.screen == Screen.SETTINGS) { viewModel.closeSettings() }
+    // 设置页与它的子页按系统返回键都该回上一级，而不是退出 App
+    BackHandler(enabled = state.screen != Screen.HOME) { viewModel.goBack() }
 
     // 用 Scaffold 承载悬浮按钮与 Snackbar：它会自动把按钮抬到 Snackbar 之上，
     // 手写 Box 的话两者会在底部叠在一起
@@ -218,7 +223,9 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
         AnimatedContent(
             targetState = state.screen,
             transitionSpec = {
-                if (targetState == Screen.SETTINGS) {
+                // 看层级而不是看具体是哪一页：设置主页 → 子页是从右滑入，
+                // 子页 → 设置主页或设置主页 → 首页都是从左滑入
+                if (screenDepth(targetState) > screenDepth(initialState)) {
                     slideInHorizontally { it } togetherWith slideOutHorizontally { -it / 4 }
                 } else {
                     slideInHorizontally { -it / 4 } togetherWith slideOutHorizontally { it }
@@ -238,16 +245,36 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
                     onSyncClick = viewModel::syncNow,
                 )
 
+                // 设置主页只是一张导航表，内容分散在下面四页里
                 Screen.SETTINGS -> SettingsScreen(
+                    healthConnectSupported =
+                        state.healthConnect.availability != SyncAvailabilityUi.UNSUPPORTED,
+                    onBack = viewModel::goBack,
+                    onOpenBmiStandard = { viewModel.openSettingsPage(Screen.SETTINGS_BMI) },
+                    onOpenData = { viewModel.openSettingsPage(Screen.SETTINGS_DATA) },
+                    onOpenExperimental = {
+                        viewModel.openSettingsPage(Screen.SETTINGS_EXPERIMENTAL)
+                    },
+                    onOpenAbout = { viewModel.openSettingsPage(Screen.SETTINGS_ABOUT) },
+                )
+
+                Screen.SETTINGS_BMI -> BmiStandardPage(
                     bmiStandard = state.bmiStandard,
+                    onSelect = viewModel::setBmiStandard,
+                    onBack = viewModel::goBack,
+                )
+
+                Screen.SETTINGS_DATA -> DataManagementPage(
                     recordCount = state.recordCount,
-                    versionName = BuildConfig.VERSION_NAME,
-                    healthConnect = state.healthConnect,
-                    experimental = state.experimental,
-                    onBack = viewModel::closeSettings,
-                    onBmiStandardChange = viewModel::setBmiStandard,
                     onExport = { exportLauncher.launch(defaultBackupFileName()) },
                     onImport = { importLauncher.launch(arrayOf("*/*")) },
+                    onClearData = viewModel::clearAllData,
+                    onBack = viewModel::goBack,
+                )
+
+                Screen.SETTINGS_EXPERIMENTAL -> ExperimentalPage(
+                    healthConnect = state.healthConnect,
+                    experimental = state.experimental,
                     // 这一行只负责把功能**配好**，不再发起同步 —— 同步的入口是首页那个
                     // 按钮（手动同步开关）与冷启动（自动同步开关）。判定顺序写在
                     // syncRowAction() 里，那边有单测守着
@@ -272,7 +299,11 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
                     onExperimentalEnabledChange = viewModel::setExperimentalEnabled,
                     onManualSyncChange = viewModel::setManualSyncEnabled,
                     onAutoSyncChange = viewModel::setAutoSyncEnabled,
-                    onClearData = viewModel::clearAllData,
+                    onBack = viewModel::goBack,
+                )
+
+                Screen.SETTINGS_ABOUT -> AboutPage(
+                    versionName = BuildConfig.VERSION_NAME,
                     // 只把发布页交给浏览器 —— 本 App 不联网，所以点下去是「去看有没有新版」，
                     // 不是「替你查」。真没装浏览器（去 Google 化的机器）就给一句提示，
                     // 不要静默失败
@@ -285,6 +316,7 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
                             }
                         }
                     },
+                    onBack = viewModel::goBack,
                 )
             }
         }

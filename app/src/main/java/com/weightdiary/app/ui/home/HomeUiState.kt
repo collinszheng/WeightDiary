@@ -87,6 +87,33 @@ data class HomeUiState(
 enum class Screen {
     HOME,
     SETTINGS,
+
+    /** 设置主页里的四页。设置主页本身只是导航，内容都在这些页里（`docs/02` §9） */
+    SETTINGS_BMI,
+    SETTINGS_DATA,
+    SETTINGS_EXPERIMENTAL,
+    SETTINGS_ABOUT,
+}
+
+/**
+ * 返回键的去向：设置主页回首页，设置的子页回设置主页。
+ *
+ * 抽成纯函数是为了能单测 —— 逐级回退这种规则，靠手点很容易漏掉某一页。
+ */
+fun backTarget(from: Screen): Screen = when (from) {
+    Screen.HOME -> Screen.HOME
+    Screen.SETTINGS -> Screen.HOME
+    else -> Screen.SETTINGS
+}
+
+/**
+ * 页面在导航里的层级。只用来决定切换动画的方向 ——
+ * 往里走（层级变大）从右滑进来，往回退从左滑进来，和系统返回的手感一致。
+ */
+fun screenDepth(from: Screen): Int = when (from) {
+    Screen.HOME -> 0
+    Screen.SETTINGS -> 1
+    else -> 2
 }
 
 const val HOME_HISTORY_LIMIT = 3
