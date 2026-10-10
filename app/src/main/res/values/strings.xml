@@ -139,6 +139,11 @@
          不是本 App 能控制的事 —— 所以不放在「数据管理」里假装是自带能力。 -->
     <string name="settings_section_experimental">实验功能</string>
 
+    <!-- 这一节的总开关。默认关：能不能用取决于第三方 App 是否往 HC 写，
+         不是本 App 的能力，不该默认亮在设置里 -->
+    <string name="settings_experimental_enable">启用实验功能</string>
+    <string name="settings_experimental_enable_desc">开启后可使用体脂秤同步等验证中的功能</string>
+
     <string name="settings_section_about">关于</string>
     <string name="about_version">版本 %1$s</string>
     <string name="about_privacy">数据仅在本机处理。若系统已开启备份，备份内容可能包含本应用数据</string>
@@ -154,11 +159,20 @@
     <!-- 体脂秤同步（Health Connect）—— 走设备内 IPC，不联网 -->
     <string name="settings_health_connect">体脂秤同步</string>
     <string name="settings_hc_experiment_hint">此功能为实验性质：通过「健康数据共享」读取数据，需要体脂秤应用能够将称重数据写入。部分品牌的应用未提供该能力。</string>
+    <!-- 两种同步方式可以同时打开：自动同步只在启动时跑一次，
+         运行期间想补一次就得靠首页那个按钮 -->
+    <string name="settings_manual_sync">手动同步</string>
+    <string name="settings_manual_sync_desc">在首页显示同步按钮，点击后读取体脂秤数据</string>
+    <string name="settings_auto_sync">自动同步</string>
+    <string name="settings_auto_sync_desc">每次启动应用时自动读取一次；运行期间的新数据需手动同步</string>
+    <string name="action_sync">同步</string>
+
     <string name="settings_hc_needs_anchor">请先手动记录一条体重，再接入体脂秤</string>
     <string name="settings_hc_not_installed">需先安装「健康数据共享」</string>
     <string name="settings_hc_needs_update">「健康数据共享」需要更新</string>
     <string name="settings_hc_needs_permission">读取体重与体脂率，无需网络权限</string>
-    <string name="settings_hc_ready">点击读取体脂秤数据</string>
+    <!-- 授权之后这一行不再可点（没有动作可做了），所以这里只报状态，不写成动作 -->
+    <string name="settings_hc_ready">已获得读取权限</string>
     <string name="settings_hc_syncing">正在同步…</string>
     <string name="settings_hc_synced">上次 %1$s · 已同步 %2$d 条</string>
 

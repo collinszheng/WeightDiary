@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -94,12 +95,26 @@ class HomeViewModel(
 
     private val uiLocal = combine(activeSheet, editingId, screen, syncLocal, ::UiLocal)
 
+    /**
+     * 实验功能的三个开关先自己合成一个流。
+     *
+     * 不是为了好看：`combine` 最多接 5 个流，这里已经有 dataSnapshot / chartTab /
+     * chartAnchor / uiLocal 四个，直接铺开会超。
+     */
+    private val experimentalUi: Flow<ExperimentalUi> = combine(
+        repository.experimentalEnabled,
+        repository.manualSyncEnabled,
+        repository.autoSyncEnabled,
+        ::ExperimentalUi,
+    )
+
     val uiState: StateFlow<HomeUiState> = combine(
         dataSnapshot,
         chartTab,
         chartAnchor,
         uiLocal,
-    ) { data, tab, anchor, local ->
+        experimentalUi,
+    ) { data, tab, anchor, local, experimental ->
         buildState(
             records = data.records,
             profile = data.profile,
@@ -110,6 +125,7 @@ class HomeViewModel(
             anchor = anchor,
             sync = local.sync,
             lastSyncAt = data.lastSyncAt,
+            experimental = experimental,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -118,7 +134,38 @@ class HomeViewModel(
     )
 
     init {
-        viewModelScope.launch { refreshSyncStatus() }
+        viewModelScope.launch {
+            refreshSyncStatus()
+            autoSyncOnLaunch()
+        }
+    }
+
+    /**
+     * 冷启动自动同步**一次**（用户明确要求：只在打开软件时同步，运行期间来的新数据
+     * 不自动同步，要么手动点、要么下次启动再说）。
+     *
+     * 放在 ViewModel 的 init 里而不是 Activity 的 LaunchedEffect：init 跟着 ViewModel
+     * 实例走，旋转屏幕、切到设置再回来都不会重放；LaunchedEffect 会重放。
+     *
+     * **刻意不读 `uiState` 判断授权** —— DataStore 和系统查询都是异步的，`uiState`
+     * 首帧里 granted 还是默认的 false，照着它判断自动同步永远不会发生。所以先 await
+     * [refreshSyncStatus]（上面那行），再读这两个 MutableStateFlow 的**当前值**。
+     *
+     * 前提不满足时**一律静默**：启动第一屏弹系统授权框、或弹「先记一条体重」的表单
+     * 都很烦人。不报错、不提示，用户想同步时手动点一下。
+     */
+    private suspend fun autoSyncOnLaunch() {
+        val autoActive = repository.experimentalEnabled.first() &&
+            repository.autoSyncEnabled.first()
+        // 库里一条记录都没有时，时间边界与异常过滤都没有锚点，不能同步（docs/08 §6.2）
+        val hasAnchor = repository.records.first().isNotEmpty()
+        val shouldSync = canAutoSyncOnLaunch(
+            autoActive = autoActive,
+            availability = syncAvailability.value,
+            granted = syncGranted.value,
+            hasAnchor = hasAnchor,
+        )
+        if (shouldSync) syncNow()
     }
 
     // ─────────────── 体脂秤同步 ───────────────
@@ -174,6 +221,18 @@ class HomeViewModel(
             }
             syncing.value = false
         }
+    }
+
+    /**
+     * 体脂秤那一行在「本机没装 / 版本太老」时被点：**只说清是哪一种情况**，不发请求。
+     *
+     * 这两种情况下都不该去请求权限：应用不在，系统弹窗会以「应用不存在」这类
+     * 看不懂的方式失败，用户只会以为 App 坏了。
+     */
+    fun explainSyncUnavailable() {
+        val availability = syncAvailability.value
+        if (availability == SyncAvailabilityUi.AVAILABLE) return
+        viewModelScope.launch { _events.send(HomeEvent.SyncUnavailable(availability)) }
     }
 
     // ─────────────── 图表 ───────────────
@@ -291,6 +350,20 @@ class HomeViewModel(
 
     fun setBmiStandard(standard: BmiStandard) {
         viewModelScope.launch { repository.setBmiStandard(standard) }
+    }
+
+    // ─────────────── 实验功能开关 ───────────────
+
+    fun setExperimentalEnabled(enabled: Boolean) {
+        viewModelScope.launch { repository.setExperimentalEnabled(enabled) }
+    }
+
+    fun setManualSyncEnabled(enabled: Boolean) {
+        viewModelScope.launch { repository.setManualSyncEnabled(enabled) }
+    }
+
+    fun setAutoSyncEnabled(enabled: Boolean) {
+        viewModelScope.launch { repository.setAutoSyncEnabled(enabled) }
     }
 
     fun exportData(uri: android.net.Uri) {
@@ -411,6 +484,7 @@ private fun buildState(
     anchor: LocalDate,
     sync: SyncLocal,
     lastSyncAt: Instant?,
+    experimental: ExperimentalUi,
     zone: ZoneId = ZoneId.systemDefault(),
     today: LocalDate = LocalDate.now(zone),
 ): HomeUiState {
@@ -470,6 +544,7 @@ private fun buildState(
             syncedCount = records.count { it.source == RecordSource.HEALTH_CONNECT },
             needsAnchor = records.isEmpty(),
         ),
+        experimental = experimental,
     )
 }
 

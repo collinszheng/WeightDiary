@@ -24,6 +24,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,8 +48,11 @@ import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.model.BmiStandard
 import com.weightdiary.app.ui.common.formatShortDateTime
+import com.weightdiary.app.ui.home.ExperimentalUi
 import com.weightdiary.app.ui.home.HealthConnectUi
 import com.weightdiary.app.ui.home.SyncAvailabilityUi
+import com.weightdiary.app.ui.home.SyncRowAction
+import com.weightdiary.app.ui.home.syncRowAction
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
 /**
@@ -56,7 +61,7 @@ import com.weightdiary.app.ui.theme.WeightDiaryTheme
  * 入口按钮在右上角，再用从下往上弹的弹窗就不呼应了 ——
  * 和「添加数据」那个悬浮按钮是同一个道理。
  *
- * 三块：BMI 标准、数据管理、关于。
+ * 四块：BMI 标准、数据管理、实验功能、关于。
  * 数据管理走 SAF（系统文件选择器）而不是自己写文件：不需要存储权限，
  * 用户自己决定存到哪，也不会有「App 偷偷写了什么」的疑虑。
  */
@@ -66,11 +71,15 @@ fun SettingsScreen(
     recordCount: Int,
     versionName: String,
     healthConnect: HealthConnectUi,
+    experimental: ExperimentalUi,
     onBack: () -> Unit,
     onBmiStandardChange: (BmiStandard) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onHealthConnectClick: () -> Unit,
+    onExperimentalEnabledChange: (Boolean) -> Unit,
+    onManualSyncChange: (Boolean) -> Unit,
+    onAutoSyncChange: (Boolean) -> Unit,
     onClearData: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -188,23 +197,54 @@ fun SettingsScreen(
 
             // ─────────── 实验功能 ───────────
             //
-            // 体脂秤同步从「数据管理」挪到这里，并配一句说明。理由：它能不能用
-            // **取决于第三方 App 愿不愿意往 HC 写**，不是本 App 的能力 ——
-            // 小米官方那个 App 就不写（实测）。混在「数据管理」里会让人以为这是
-            // 自带功能，用不了时只会觉得是坏的。
+            // 这一节先给一个**总开关**（默认关），打开后才露出体脂秤同步和两种同步方式。
+            // 理由：它能不能用**取决于第三方 App 愿不愿意往 HC 写**，不是本 App 的能力 ——
+            // 小米官方那个 App 就不写（实测）。默认亮着会让人以为这是自带功能，
+            // 用不了时只会觉得是坏的。
             //
             // API < 28 时**整节不出现**（连标题一起）：宁可功能不出现，也不能留一张
             // 空卡片配一句「此功能不支持」（docs/06 §2.2）
             if (healthConnect.availability != SyncAvailabilityUi.UNSUPPORTED) {
+                // 那一行只在**有动作可做**时可点（建锚点 / 授权 / 装 HC），
+                // 配好之后退化成纯信息 —— 挂着箭头却点不动比没有箭头更糟
+                val action = syncRowAction(healthConnect)
+
                 Spacer(Modifier.height(dimen.sectionGap))
 
                 SectionLabel(stringResource(R.string.settings_section_experimental))
                 SettingsGroup {
-                    SettingsRow(
-                        title = stringResource(R.string.settings_health_connect),
-                        description = healthConnectDescription(healthConnect),
-                        onClick = onHealthConnectClick,
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_experimental_enable),
+                        description = stringResource(R.string.settings_experimental_enable_desc),
+                        checked = experimental.enabled,
+                        onCheckedChange = onExperimentalEnabledChange,
                     )
+
+                    if (experimental.enabled) {
+                        GroupDivider()
+                        SettingsRow(
+                            title = stringResource(R.string.settings_health_connect),
+                            description = healthConnectDescription(healthConnect),
+                            onClick = onHealthConnectClick.takeIf {
+                                action != SyncRowAction.NONE &&
+                                    action != SyncRowAction.UNSUPPORTED
+                            },
+                        )
+                        GroupDivider()
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_manual_sync),
+                            description = stringResource(R.string.settings_manual_sync_desc),
+                            checked = experimental.manualSync,
+                            onCheckedChange = onManualSyncChange,
+                        )
+                        GroupDivider()
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.settings_auto_sync),
+                            description = stringResource(R.string.settings_auto_sync_desc),
+                            checked = experimental.autoSync,
+                            onCheckedChange = onAutoSyncChange,
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(6.dp))
@@ -333,11 +373,17 @@ private fun GroupDivider() {
     )
 }
 
+/**
+ * 列表行。
+ *
+ * @param onClick 传 null 表示**这一行当前没有动作可做**：此时不可点、也不画箭头，
+ *   退化成纯信息行。留着箭头却点不动，比没有箭头更让人困惑
+ */
 @Composable
 private fun SettingsRow(
     title: String,
     description: String,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
     danger: Boolean = false,
 ) {
     val colors = WeightDiaryTheme.colors
@@ -347,7 +393,13 @@ private fun SettingsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                }
+            )
             .padding(horizontal = dimen.cardPadding, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -365,8 +417,67 @@ private fun SettingsRow(
                 color = colors.textSecondary,
             )
         }
+        if (onClick != null) {
+            Spacer(Modifier.size(8.dp))
+            ChevronRight(tint = colors.textDisabled)
+        }
+    }
+}
+
+/**
+ * 带开关的列表行。
+ *
+ * 开关的未选中态必须**显式配色**：主题里 `surfaceVariant = cardFill`、`outline = cardBorder`，
+ * 而这一行本身就画在 cardFill 上 —— 用 M3 默认值的话轨道与卡片同色，只剩一圈浅灰边，
+ * 看起来像坏的。选中态用主题默认值（accent 轨道 + 白滑块）即可。
+ */
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val colors = WeightDiaryTheme.colors
+    val typo = WeightDiaryTheme.typography
+    val dimen = WeightDiaryTheme.dimens
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            // 整行可点：开关本身只有 32×20，让整行都能切更符合预期
+            .clickable(role = Role.Switch) { onCheckedChange(!checked) }
+            .padding(horizontal = dimen.cardPadding, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = typo.body,
+                color = colors.textPrimary,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = description,
+                style = typo.cardLabel,
+                color = colors.textSecondary,
+            )
+        }
         Spacer(Modifier.size(8.dp))
-        ChevronRight(tint = colors.textDisabled)
+        Switch(
+            checked = checked,
+            // 整行已经处理点击了。这里传 null，免得读屏把同一件事报两遍
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = colors.accent,
+                checkedBorderColor = Color.Transparent,
+                uncheckedThumbColor = colors.textDisabled,
+                uncheckedTrackColor = colors.divider,
+                uncheckedBorderColor = colors.cardBorder,
+            ),
+        )
     }
 }
 

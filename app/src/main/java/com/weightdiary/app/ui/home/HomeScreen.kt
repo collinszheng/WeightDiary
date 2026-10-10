@@ -3,6 +3,7 @@ package com.weightdiary.app.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,7 @@ import com.weightdiary.app.ui.home.components.GoalStatusCard
 import com.weightdiary.app.ui.home.components.HistorySection
 import com.weightdiary.app.ui.home.components.HomeSkeleton
 import com.weightdiary.app.ui.home.components.SettingsIconButton
+import com.weightdiary.app.ui.home.components.SyncIconButton
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 
 /**
@@ -48,6 +50,7 @@ fun HomeScreen(
     onRecordClick: (RecordRow) -> Unit,
     onViewAllRecords: () -> Unit,
     onSettingsClick: () -> Unit,
+    onSyncClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = WeightDiaryTheme.colors
@@ -81,12 +84,23 @@ fun HomeScreen(
                 color = colors.textPrimary,
                 modifier = Modifier.align(Alignment.Center),
             )
-            SettingsIconButton(
-                onClick = onSettingsClick,
+            Row(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = dimen.pageHorizontal - (dimen.minTouchTarget - 40.dp) / 2),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // 只在「手动同步」打开时出现。自动同步开着时它也在 ——
+                // 运行期间新来的数据不会自动同步，得靠这个按钮补一次
+                if (state.experimental.manualActive) {
+                    SyncIconButton(
+                        onClick = onSyncClick,
+                        enabled = !state.healthConnect.syncing,
+                        syncing = state.healthConnect.syncing,
+                    )
+                }
+                SettingsIconButton(onClick = onSettingsClick)
+            }
         }
 
         Spacer(Modifier.height(8.dp))

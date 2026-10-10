@@ -48,6 +48,17 @@ class WeightRepository(
     /** 上次同步时刻。设置页要显示它（`docs/08` §6.3） */
     val lastSyncAt: Flow<Instant?> = syncStore.lastSyncAt
 
+    /**
+     * 实验功能的三个开关。
+     *
+     * 总开关关着时，两个同步方式**一律不生效**（判定在
+     * [com.weightdiary.app.ui.home.ExperimentalUi]）—— 开关值本身保留，
+     * 重新打开还是原样。
+     */
+    val experimentalEnabled: Flow<Boolean> = syncStore.experimentalEnabled
+    val manualSyncEnabled: Flow<Boolean> = syncStore.manualSyncEnabled
+    val autoSyncEnabled: Flow<Boolean> = syncStore.autoSyncEnabled
+
     fun recent(limit: Int): Flow<List<WeightRecord>> =
         dao.observeRecent(limit).map { list -> list.map(WeightRecordEntity::toDomain) }
 
@@ -235,4 +246,15 @@ class WeightRepository(
 
     suspend fun setOnboardingCompleted(completed: Boolean) =
         profileStore.setOnboardingCompleted(completed)
+
+    // ─────────────── 实验功能开关 ───────────────
+
+    suspend fun setExperimentalEnabled(enabled: Boolean) =
+        syncStore.setExperimentalEnabled(enabled)
+
+    suspend fun setManualSyncEnabled(enabled: Boolean) =
+        syncStore.setManualSyncEnabled(enabled)
+
+    suspend fun setAutoSyncEnabled(enabled: Boolean) =
+        syncStore.setAutoSyncEnabled(enabled)
 }

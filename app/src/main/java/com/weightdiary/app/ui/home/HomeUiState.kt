@@ -71,8 +71,11 @@ data class HomeUiState(
     /** 当前整屏。设置是**整屏**而不是弹窗 —— 入口在右上角，从下往上弹不呼应 */
     val screen: Screen = Screen.HOME,
 
-    /** 设置页「数据管理」里那一行的状态（`docs/08` §6） */
+    /** 设置页「实验功能」里体脂秤那一行的状态（`docs/08` §6） */
     val healthConnect: HealthConnectUi = HealthConnectUi(),
+
+    /** 设置页「实验功能」的总开关与两种同步方式 */
+    val experimental: ExperimentalUi = ExperimentalUi(),
 ) {
     /** 首页历史区默认展示条数（设计规范 §4.5：默认展示最近 2–3 条） */
     val historyLimit: Int get() = HOME_HISTORY_LIMIT
@@ -218,3 +221,29 @@ data class HealthConnectUi(
      */
     val needsAnchor: Boolean = false,
 )
+
+/**
+ * 「实验功能」这一节的状态：一个总开关 + 两种同步方式。
+ *
+ * 分三层而不是一个三选一：总开关管**这一节露不露面**，两个同步方式各管**同步什么时候发生**，
+ * 两者可以同时打开（自动同步开着时首页按钮也还在，用户随时能手动补一次）。
+ */
+data class ExperimentalUi(
+    /** 总开关。默认关；关着时设置页那一节只剩开关本身，同步相关的行全部不出现 */
+    val enabled: Boolean = false,
+
+    /** 手动同步：打开后首页顶栏出现同步按钮，点了才同步 */
+    val manualSync: Boolean = false,
+
+    /** 自动同步：每次冷启动自动同步一次（默认关） */
+    val autoSync: Boolean = false,
+) {
+    /**
+     * 两个同步方式是否**真的生效**。
+     *
+     * 总开关关掉时，下面两个开关的值**保留**（用户重新打开还是原样），但一律不生效 ——
+     * 否则会出现「总开关关了，首页那个同步按钮还杵在那」的矛盾状态。
+     */
+    val manualActive: Boolean get() = enabled && manualSync
+    val autoActive: Boolean get() = enabled && autoSync
+}

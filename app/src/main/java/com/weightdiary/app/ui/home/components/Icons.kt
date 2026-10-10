@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -176,6 +177,88 @@ fun PencilIconButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
                 start = Offset(px(10.4f), px(5.6f)),
                 end = Offset(px(11.6f), px(6.8f)),
                 strokeWidth = px(1.1f),
+            )
+        }
+    }
+}
+
+/**
+ * 顶栏的「同步」按钮。只在设置里打开「手动同步」时出现。
+ *
+ * 画的是循环箭头（缺口朝上的圆弧 + 一个切向箭头），和设置按钮同一套规格：
+ * 触摸区 48dp、视觉 20dp、描边 1.6dp —— 顶栏上两个图标必须看起来是一对，
+ * 大小差一点点都很显眼。
+ *
+ * @param enabled 同步进行中传 false：把图标压成禁用色。防止连点，也让用户看到
+ *   「正在同步」而不只是等一个静默的 Snackbar。
+ */
+@Composable
+fun SyncIconButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    syncing: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = WeightDiaryTheme.colors
+    val dimen = WeightDiaryTheme.dimens
+    val description = if (syncing) {
+        stringResource(R.string.settings_hc_syncing)
+    } else {
+        stringResource(R.string.action_sync)
+    }
+
+    Box(
+        modifier = modifier
+            .size(dimen.minTouchTarget)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick, role = Role.Button)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        val tint = if (enabled) colors.textPrimary else colors.textDisabled
+
+        Canvas(Modifier.size(20.dp)) {
+            val stroke = 1.6.dp.toPx()
+            val inset = stroke * 1.2f
+            val diameter = size.minDimension - inset * 2f
+            val radius = diameter / 2f
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+
+            // 缺口留在正上方（−55° 起、扫 265°，终点 210° 落在左上方）
+            val startAngle = -55f
+            val sweep = 265f
+            drawArc(
+                color = tint,
+                startAngle = startAngle,
+                sweepAngle = sweep,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = Size(diameter, diameter),
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+
+            // 箭头长在弧的**终点**，沿顺时针切向指出去 —— 读起来就是「朝这个方向转」
+            val endRad = (startAngle + sweep) * PI / 180.0
+            val ex = cx + radius * cos(endRad).toFloat()
+            val ey = cy + radius * sin(endRad).toFloat()
+            // Compose 的 y 轴朝下，所以顺时针切向是 (−sin, cos)
+            val tx = -sin(endRad).toFloat()
+            val ty = cos(endRad).toFloat()
+            // 半径方向（由圆心指向外），用来定箭头两翼
+            val nx = cos(endRad).toFloat()
+            val ny = sin(endRad).toFloat()
+
+            val tipLength = stroke * 2.4f
+            val halfWidth = stroke * 1.4f
+            drawPath(
+                path = Path().apply {
+                    moveTo(ex + tx * tipLength, ey + ty * tipLength)
+                    lineTo(ex + nx * halfWidth, ey + ny * halfWidth)
+                    lineTo(ex - nx * halfWidth, ey - ny * halfWidth)
+                    close()
+                },
+                color = tint,
             )
         }
     }

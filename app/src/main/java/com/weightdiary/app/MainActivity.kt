@@ -41,6 +41,8 @@ import com.weightdiary.app.domain.record.RecordCsv
 import com.weightdiary.app.ui.home.HomeViewModel
 import com.weightdiary.app.ui.home.Screen
 import com.weightdiary.app.ui.home.SyncAvailabilityUi
+import com.weightdiary.app.ui.home.SyncRowAction
+import com.weightdiary.app.ui.home.syncRowAction
 import com.weightdiary.app.ui.home.components.AddRecordFab
 import com.weightdiary.app.ui.sheet.AddRecordSheet
 import com.weightdiary.app.ui.sheet.AllRecordsSheet
@@ -231,6 +233,7 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
                     onRecordClick = { viewModel.startEdit(it) },
                     onViewAllRecords = { viewModel.openSheet(ActiveSheet.ALL_RECORDS) },
                     onSettingsClick = viewModel::openSettings,
+                    onSyncClick = viewModel::syncNow,
                 )
 
                 Screen.SETTINGS -> SettingsScreen(
@@ -238,23 +241,35 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
                     recordCount = state.recordCount,
                     versionName = BuildConfig.VERSION_NAME,
                     healthConnect = state.healthConnect,
+                    experimental = state.experimental,
                     onBack = viewModel::closeSettings,
                     onBmiStandardChange = viewModel::setBmiStandard,
                     onExport = { exportLauncher.launch(defaultBackupFileName()) },
                     onImport = { importLauncher.launch(arrayOf("*/*")) },
+                    // 这一行只负责把功能**配好**，不再发起同步 —— 同步的入口是首页那个
+                    // 按钮（手动同步开关）与冷启动（自动同步开关）。判定顺序写在
+                    // syncRowAction() 里，那边有单测守着
                     onHealthConnectClick = {
-                        when {
+                        when (syncRowAction(state.healthConnect)) {
                             // 库里一条记录都没有 → 先引导记一条自己的体重。
                             // 那条记录同时是时间边界和异常过滤的锚点，跳过它就会
                             // 无过滤地吞下一家人的数据（docs/08 §6.2）
-                            state.healthConnect.needsAnchor ->
+                            SyncRowAction.ADD_ANCHOR ->
                                 viewModel.openSheet(ActiveSheet.ADD_RECORD)
 
-                            state.healthConnect.granted -> viewModel.syncNow()
+                            SyncRowAction.REQUEST_PERMISSION ->
+                                permissionLauncher.launch(HealthConnectSource.PERMISSIONS)
 
-                            else -> permissionLauncher.launch(HealthConnectSource.PERMISSIONS)
+                            // 没装 / 版本太老：这两行仍然可点，但只解释、不发请求 ——
+                            // 应用不在时去请求权限，系统弹窗会以「应用不存在」失败
+                            SyncRowAction.EXPLAIN -> viewModel.explainSyncUnavailable()
+
+                            SyncRowAction.NONE, SyncRowAction.UNSUPPORTED -> Unit
                         }
                     },
+                    onExperimentalEnabledChange = viewModel::setExperimentalEnabled,
+                    onManualSyncChange = viewModel::setManualSyncEnabled,
+                    onAutoSyncChange = viewModel::setAutoSyncEnabled,
                     onClearData = viewModel::clearAllData,
                 )
             }
