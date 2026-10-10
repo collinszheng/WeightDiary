@@ -15,16 +15,21 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
 import com.weightdiary.app.domain.chart.ChartTab
 import com.weightdiary.app.domain.record.RecordRow
+import com.weightdiary.app.ui.common.fitVerticalScroll
 import com.weightdiary.app.ui.home.components.ChartCard
 
 import com.weightdiary.app.ui.home.components.GoalStatusCard
@@ -37,9 +42,13 @@ import com.weightdiary.app.ui.theme.WeightDiaryTheme
 /**
  * 首页。
  *
- * 整体是 `Column + verticalScroll` 而不是 `LazyColumn`：历史记录区在首页只展示最近几条，
+ * 整体是 `Column + fitVerticalScroll` 而不是 `LazyColumn`：历史记录区在首页只展示最近几条，
  * 数据量恒定，用不着懒加载的复用机制；而图表 Canvas 放进 LazyColumn 反而会因为
  * 回收重组带来无谓的重新测量。
+ *
+ * 滚动也用 [fitVerticalScroll] 而不是裸 `verticalScroll`：内容一屏放得下时就不让它滑。
+ * 末尾那段给悬浮按钮留的净空要单独量出来传进去 —— 它是看不见的空白，
+ * 不该成为「能滑」的理由。
  */
 @Composable
 fun HomeScreen(
@@ -63,11 +72,15 @@ fun HomeScreen(
         return
     }
 
+    val scrollState = rememberScrollState()
+    // 末尾那段净空的实际高度，量出来交给 fitVerticalScroll（见文件头注释）
+    var trailingPx by remember { mutableIntStateOf(0) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(colors.background)
-            .verticalScroll(rememberScrollState()),
+            .fitVerticalScroll(scrollState, ignoreTrailingPx = trailingPx),
     ) {
         // ─────────── 顶部导航栏 ───────────
         // 背景已由外层 Column 铺满（含状态栏区域），这里只把**内容**下移避开状态栏。
@@ -141,11 +154,13 @@ fun HomeScreen(
             )
         }
 
-        // 给右下角的悬浮按钮留出净空：不然它会把最后一块内容永久盖住
-        Spacer(Modifier.height(dimen.fabSize + dimen.fabMargin * 2))
-
-        // 避让底部手势条
-        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+        // 末尾这段是**看不见的净空**：给右下角的悬浮按钮留位置（不然它会把最后一块内容
+        // 永久盖住），再加避让底部手势条。包一层 Column 是为了量出它的高度 ——
+        // 这一段在屏幕上什么都不显示，却足以让「本来刚好装下」的首页变得可以滑动
+        Column(modifier = Modifier.onSizeChanged { trailingPx = it.height }) {
+            Spacer(Modifier.height(dimen.fabSize + dimen.fabMargin * 2))
+            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+        }
     }
 }
 
