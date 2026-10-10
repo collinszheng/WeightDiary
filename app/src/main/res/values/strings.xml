@@ -147,6 +147,12 @@
     <string name="settings_section_about">关于</string>
     <string name="about_version">版本 %1$s</string>
     <string name="about_privacy">数据仅在本机处理。若系统已开启备份，备份内容可能包含本应用数据</string>
+    <!-- 更新只做到「把发布页交给浏览器」：发一个 ACTION_VIEW 就结束，
+         联网的是浏览器而不是本 App，所以不必声明 INTERNET（docs/04 §7.9）。
+         措辞也照这个事实来 —— 是「查看」不是「检测」，App 并不知道有没有新版。 -->
+    <string name="about_view_releases">查看新版本</string>
+    <string name="about_view_releases_desc">在浏览器中打开 GitHub 发布页</string>
+    <string name="about_releases_url" translatable="false">https://github.com/collinszheng/WeightDiary/releases/latest</string>
 
     <string name="snack_exported">已导出 %1$d 条记录</string>
     <string name="snack_export_empty">暂无可导出的记录</string>
@@ -155,6 +161,7 @@
     <string name="snack_cleared">已清空所有记录</string>
     <string name="snack_export_failed">导出失败：%1$s</string>
     <string name="snack_import_failed">导入失败：%1$s</string>
+    <string name="snack_no_browser">没有可打开网页的应用</string>
 
     <!-- 体脂秤同步（Health Connect）—— 走设备内 IPC，不联网 -->
     <string name="settings_health_connect">体脂秤同步</string>

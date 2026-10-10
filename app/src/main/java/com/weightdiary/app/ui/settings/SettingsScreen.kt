@@ -81,6 +81,7 @@ fun SettingsScreen(
     onManualSyncChange: (Boolean) -> Unit,
     onAutoSyncChange: (Boolean) -> Unit,
     onClearData: () -> Unit,
+    onViewReleases: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = WeightDiaryTheme.colors
@@ -286,6 +287,14 @@ fun SettingsScreen(
                         color = colors.textSecondary,
                     )
                 }
+                GroupDivider()
+                // 这一行只是把发布页**交给浏览器**打开 —— 本 App 不声明 INTERNET，
+                // 所以它做不到「替你查有没有新版」，文案也照实说是「查看」而不是「检测」
+                SettingsRow(
+                    title = stringResource(R.string.about_view_releases),
+                    description = stringResource(R.string.about_view_releases_desc),
+                    onClick = onViewReleases,
+                )
             }
 
             Spacer(Modifier.height(dimen.sectionGap))

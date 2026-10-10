@@ -1,6 +1,8 @@
 package com.weightdiary.app
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -271,6 +273,18 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
                     onManualSyncChange = viewModel::setManualSyncEnabled,
                     onAutoSyncChange = viewModel::setAutoSyncEnabled,
                     onClearData = viewModel::clearAllData,
+                    // 只把发布页交给浏览器 —— 本 App 不联网，所以点下去是「去看有没有新版」，
+                    // 不是「替你查」。真没装浏览器（去 Google 化的机器）就给一句提示，
+                    // 不要静默失败
+                    onViewReleases = {
+                        if (!openReleases(context)) {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    context.getString(R.string.snack_no_browser),
+                                )
+                            }
+                        }
+                    },
                 )
             }
         }
@@ -352,6 +366,21 @@ private fun HomeWithSheets(state: HomeUiState, viewModel: HomeViewModel) {
  * （adb 传 UTF-8、PowerShell 按 GBK 解码，文件名会变成乱码）。
  * 文件**内容**仍然是中文表头，方便直接用 Excel 打开。
  */
+/**
+ * 打开 GitHub 发布页。**联网的是浏览器，不是本 App** —— 这里只发一个 `ACTION_VIEW`
+ * 就结束，APK 里依旧没有 `INTERNET`（`tools/verify-no-internet.ps1` 守着这条）。
+ *
+ * 刻意**不用** `intent.resolveActivity(packageManager)` 预判有没有浏览器：API 30+ 的
+ * 包可见性会让它在没有 `<queries>` 声明时返回 `null`，于是「明明装着浏览器却点不动」。
+ * 直接 `startActivity` 再兜异常反而是最准的判断。
+ *
+ * @return 是否真的把 URL 交出去了
+ */
+private fun openReleases(context: Context): Boolean {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(context.getString(R.string.about_releases_url)))
+    return runCatching { context.startActivity(intent) }.isSuccess
+}
+
 private fun defaultBackupFileName(): String =
     "WeightDiary-" + DateTimeFormatter.ISO_LOCAL_DATE.format(LocalDate.now()) + ".csv"
 
