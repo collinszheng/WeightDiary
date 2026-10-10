@@ -359,8 +359,10 @@ private fun defaultBackupFileName(): String =
  * 同步结果的提示文案。
  *
  * 「一条都没进来」有好几种不同的原因，混成一个「已同步 0 条」用户只会以为坏了：
- * - **首次接入必然走 [R.string.snack_sync_start_fresh]** —— 引导记录的时间就是时间边界，
- *   它之前的数据一律不收（`docs/08` §6.4）。这是有意的，但必须说清楚
+ * - **首次接入**必然有记录被跳过 —— 引导记录的时间就是时间边界，它之前的数据
+ *   一律不收（`docs/08` §6.4）。这是有意的，所以要说成 [R.string.snack_sync_start_fresh]。
+ *   **但这句只在首次成立**：边界一旦定下就不再变，那些老记录每次同步都会被再跳过一次，
+ *   之后的同步再说「从现在开始记录」就是答非所问
  * - 全都**并入**了已有记录 → 要报出并了几条，否则用户以为数据丢了
  * - 真的没有新数据
  */
@@ -376,7 +378,10 @@ private fun syncMessage(context: Context, event: HomeEvent.SyncFinished): String
     event.claimed > 0 ->
         context.getString(R.string.snack_sync_claimed_only, event.claimed)
 
-    event.skipped > 0 -> context.getString(R.string.snack_sync_start_fresh)
+    event.skipped > 0 && event.firstSync -> context.getString(R.string.snack_sync_start_fresh)
+
+    event.skipped > 0 ->
+        context.getString(R.string.snack_sync_nothing_skipped, event.skipped)
 
     else -> context.getString(R.string.snack_sync_nothing)
 }

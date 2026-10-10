@@ -168,11 +168,16 @@ sealed interface HomeEvent {
     /**
      * 同步完成。[inserted] 是真正新增的，[claimed] 是认领到已有手动记录上的
      * （不新增行，所以单独报，不然用户会以为丢数据了），[skipped] 是被跳过的。
+     *
+     * [firstSync] 是「这次之前从没成功同步过」。首次接入必然把早于时间边界的记录
+     * 全跳过，那时该说「从现在开始记录新的称重」；之后同样的 [skipped] 只意味着
+     * 「没有新数据」，不能再说那句（见 `MainActivity.syncMessage`）。
      */
     data class SyncFinished(
         val inserted: Int,
         val claimed: Int,
         val skipped: Int,
+        val firstSync: Boolean,
     ) : HomeEvent
 
     data class SyncUnavailable(val availability: SyncAvailabilityUi) : HomeEvent

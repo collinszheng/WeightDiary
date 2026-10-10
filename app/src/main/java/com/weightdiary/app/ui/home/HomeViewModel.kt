@@ -22,6 +22,7 @@ import com.weightdiary.app.domain.model.WeightRecord
 import com.weightdiary.app.domain.record.RecordRow
 import com.weightdiary.app.domain.record.RecordRows
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,6 +35,15 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+
+/**
+ * 顶栏那个转圈的最短可见时长。
+ *
+ * 同步本身常常只要几十毫秒 —— 在模拟器上连拍 8 帧、一帧都没落在同步窗口里，
+ * 也就是说点下去只会「闪一下」，用户会以为根本没反应。短于这个值时把
+ * 「正在同步」多留一会儿，让「在动」真的看得见。
+ */
+private const val MIN_SYNC_FEEDBACK_MS = 450L
 
 class HomeViewModel(
     private val repository: WeightRepository,
@@ -194,7 +204,18 @@ class HomeViewModel(
         if (syncing.value) return
         viewModelScope.launch {
             syncing.value = true
-            when (val outcome = syncCoordinator.sync()) {
+            // 首次成功同步之前水位线是空的。这个判断要在同步**之前**做：
+            // 首次接入必然把早于时间边界的记录全跳过，那时该说「从现在开始记录」，
+            // 而之后同样的 skipped 只意味着「没有新数据」，再说那句就是答非所问
+            val firstSync = repository.lastSyncAt.first() == null
+
+            val startedAt = System.nanoTime()
+            val outcome = syncCoordinator.sync()
+            val spentMs = (System.nanoTime() - startedAt) / 1_000_000
+            if (spentMs < MIN_SYNC_FEEDBACK_MS) delay(MIN_SYNC_FEEDBACK_MS - spentMs)
+            syncing.value = false
+
+            when (outcome) {
                 is SyncOutcome.Success -> {
                     syncGranted.value = true
                     _events.send(
@@ -202,6 +223,7 @@ class HomeViewModel(
                             inserted = outcome.inserted,
                             claimed = outcome.claimed,
                             skipped = outcome.skippedCount,
+                            firstSync = firstSync,
                         )
                     )
                 }
@@ -219,7 +241,6 @@ class HomeViewModel(
 
                 is SyncOutcome.Failed -> _events.send(HomeEvent.SyncFailed(outcome.reason))
             }
-            syncing.value = false
         }
     }
 

@@ -1,5 +1,10 @@
 package com.weightdiary.app.ui.home.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -189,8 +195,9 @@ fun PencilIconButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * 触摸区 48dp、视觉 20dp、描边 1.6dp —— 顶栏上两个图标必须看起来是一对，
  * 大小差一点点都很显眼。
  *
- * @param enabled 同步进行中传 false：把图标压成禁用色。防止连点，也让用户看到
- *   「正在同步」而不只是等一个静默的 Snackbar。
+ * @param enabled 同步进行中传 false：禁止连点。
+ * @param syncing 同步进行中把整个图标转起来并染成强调色。**只压成灰色是不够的** ——
+ *   灰图标读起来像「坏了」，而同步要走设备内 IPC，慢的时候必须能看出「在动」。
  */
 @Composable
 fun SyncIconButton(
@@ -207,6 +214,21 @@ fun SyncIconButton(
         stringResource(R.string.action_sync)
     }
 
+    // 只在同步时挂动画：常驻的无限动画会一直占着帧时钟
+    val rotation = if (syncing) {
+        val transition = rememberInfiniteTransition(label = "sync")
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 900, easing = LinearEasing),
+            ),
+            label = "syncRotation",
+        ).value
+    } else {
+        0f
+    }
+
     Box(
         modifier = modifier
             .size(dimen.minTouchTarget)
@@ -215,9 +237,13 @@ fun SyncIconButton(
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        val tint = if (enabled) colors.textPrimary else colors.textDisabled
+        val tint = when {
+            syncing -> colors.accent
+            !enabled -> colors.textDisabled
+            else -> colors.textPrimary
+        }
 
-        Canvas(Modifier.size(20.dp)) {
+        Canvas(Modifier.size(20.dp).rotate(rotation)) {
             val stroke = 1.6.dp.toPx()
             val inset = stroke * 1.2f
             val diameter = size.minDimension - inset * 2f

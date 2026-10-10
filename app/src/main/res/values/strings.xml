@@ -180,8 +180,11 @@
     <string name="snack_sync_done_skipped">已同步 %1$d 条，跳过 %2$d 条</string>
     <string name="snack_sync_done_claimed">已同步 %1$d 条，另有 %2$d 条并入已有记录</string>
     <string name="snack_sync_claimed_only">%1$d 条并入已有记录，无新增</string>
-    <!-- 首次接入必然走到这条：引导记录的时间就是边界，之前的数据一律不收（docs/08 §6.4） -->
+    <!-- 只在**首次**成功同步时用：引导记录的时间就是边界，之前的数据一律不收（docs/08 §6.4） -->
     <string name="snack_sync_start_fresh">已连接，将从现在开始记录新的称重</string>
+    <!-- 之后的同步里同样有记录被跳过时用这条：边界早就定了，跳过只是「没有新数据」。
+         再说「从现在开始记录」就成了答非所问 —— 那句话是首次接入才成立的 -->
+    <string name="snack_sync_nothing_skipped">没有新的称重记录，跳过 %1$d 条早于启用时间的记录</string>
     <string name="snack_sync_nothing">已连接，没有新的称重记录</string>
     <string name="snack_sync_not_installed">本机未安装「健康数据共享」，请先从应用商店安装</string>
     <string name="snack_sync_unsupported">当前系统版本不支持体脂秤同步</string>
