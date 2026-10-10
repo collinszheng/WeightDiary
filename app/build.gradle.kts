@@ -17,12 +17,12 @@ plugins {
  * 版本号。后缀走 Gradle 参数，**不写死** —— 同一份源码既能出测试版也能出正式版：
  *
  * ```bash
- * ./gradlew distRelease -PversionSuffix=-beta   # → 1.1-beta，产物 WeightDiary-1.1-beta.apk
- * ./gradlew distRelease                         # → 1.1
+ * ./gradlew distRelease -PversionSuffix=-beta   # → 1.2-beta，产物 WeightDiary-1.2-beta.apk
+ * ./gradlew distRelease                         # → 1.2
  * ```
  *
  * 产物名是从 [appVersionName] 拼出来的（见文件末尾的 `distRelease`），所以文件名会自带后缀，
- * 测试版不会覆盖掉正式版那个 `WeightDiary-1.1.apk`。
+ * 测试版不会覆盖掉正式版那个 `WeightDiary-1.2.apk`。
  *
  * ⚠️ **`versionCode` 的排序规则：测试版必须低于它之后的正式版。**
  * Android 的包管理器只拦降级 —— 装更低的 code 会被拒（`INSTALL_FAILED_VERSION_DOWNGRADE`），
@@ -32,16 +32,17 @@ plugins {
  * ```
  * 1.0        code 1   （已发布）
  * 1.1-beta   code 2   （已发布为 pre-release）
- * 1.1 正式   code 3   ← 当前
- * 1.2-beta   code 4   ← 下一轮从这里继续
+ * 1.1 正式   code 3   （已发布）
+ * 1.2 正式   code 4   ← 当前
+ * 1.3-beta   code 5   ← 下一轮从这里继续
  * ```
  *
  * code 相等是允许的（签名一致即可），只是没有「更新」信号；而本项目走 GitHub Releases
  * 手动下载、本来就没有自动更新机制，所以这一条影响很小。
  */
 val versionSuffix: String = providers.gradleProperty("versionSuffix").orNull.orEmpty()
-val appVersionName = "1.1" + versionSuffix
-val appVersionCode = 3
+val appVersionName = "1.2" + versionSuffix
+val appVersionCode = 4
 
 android {
     namespace = "com.weightdiary.app"

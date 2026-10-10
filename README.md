@@ -2,7 +2,7 @@
 
 纯本地的体重 / 体脂趋势记录 App。**没有账号、没有网络权限、没有广告** —— 数据只在本机处理。
 
-**下载**：[最新版 APK（1.1）](https://github.com/collinszheng/WeightDiary/releases/latest) · 1.71 MB · 要求 Android 8.0（minSdk 26）及以上（体脂秤同步需 Android 9+）
+**下载**：[最新版 APK（1.2）](https://github.com/collinszheng/WeightDiary/releases/latest) · 1.73 MB · 要求 Android 8.0（minSdk 26）及以上（体脂秤同步需 Android 9+）
 
 ## 功能
 
