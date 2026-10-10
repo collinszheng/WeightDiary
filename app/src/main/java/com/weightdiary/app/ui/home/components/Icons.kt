@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.weightdiary.app.R
+import com.weightdiary.app.ui.home.SYNC_SPIN_TURN_MS
 import com.weightdiary.app.ui.theme.WeightDiaryTheme
 import kotlin.math.PI
 import kotlin.math.cos
@@ -198,6 +199,9 @@ fun PencilIconButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * @param enabled 同步进行中传 false：禁止连点。
  * @param syncing 同步进行中把整个图标转起来并染成强调色。**只压成灰色是不够的** ——
  *   灰图标读起来像「坏了」，而同步要走设备内 IPC，慢的时候必须能看出「在动」。
+ *
+ * 转速与「正在同步」的时长是绑死的（[SYNC_SPIN_TURN_MS]）：转一圈刚好回到原来的角度，
+ * 所以同步结束时图标就停在原位，不会有一帧的跳变。
  */
 @Composable
 fun SyncIconButton(
@@ -221,7 +225,7 @@ fun SyncIconButton(
             initialValue = 0f,
             targetValue = 360f,
             animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 900, easing = LinearEasing),
+                animation = tween(durationMillis = SYNC_SPIN_TURN_MS.toInt(), easing = LinearEasing),
             ),
             label = "syncRotation",
         ).value

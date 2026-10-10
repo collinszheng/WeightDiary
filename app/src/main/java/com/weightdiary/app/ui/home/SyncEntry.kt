@@ -58,3 +58,25 @@ fun canAutoSyncOnLaunch(
         availability == SyncAvailabilityUi.AVAILABLE &&
         granted &&
         hasAnchor
+
+/**
+ * 同步时图标转一圈的时长，**同时也是「正在同步」最短持续时长**。
+ *
+ * 两者必须相等，这不是巧合：图标转一圈刚好回到原来的角度，所以只要让「正在同步」
+ * 正好持续**整数圈**，收尾时就与静止态无缝接上。转不到一圈就被拽回原位，看起来就是
+ * 一次突兀的抽动 —— 试过 900ms 一圈配 450ms 时长，正是转半圈后猛地弹回去。
+ */
+const val SYNC_SPIN_TURN_MS = 450L
+
+/**
+ * 「正在同步」应该持续多久：把实际耗时**向上补足到整数圈**，且至少一圈。
+ *
+ * 例（一圈 = 450ms）：0 → 450；30 → 450；450 → 450；451 → 900；900 → 900。
+ * 慢的同步（不止一圈）多等的是**当前这一圈的剩余部分**，最多 450ms。
+ *
+ * @param spentMs 同步实际花掉的毫秒数
+ */
+fun syncFeedbackMs(spentMs: Long): Long {
+    val turns = ((spentMs + SYNC_SPIN_TURN_MS - 1) / SYNC_SPIN_TURN_MS).coerceAtLeast(1L)
+    return turns * SYNC_SPIN_TURN_MS
+}

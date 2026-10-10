@@ -380,8 +380,5 @@ private fun syncMessage(context: Context, event: HomeEvent.SyncFinished): String
 
     event.skipped > 0 && event.firstSync -> context.getString(R.string.snack_sync_start_fresh)
 
-    event.skipped > 0 ->
-        context.getString(R.string.snack_sync_nothing_skipped, event.skipped)
-
     else -> context.getString(R.string.snack_sync_nothing)
 }

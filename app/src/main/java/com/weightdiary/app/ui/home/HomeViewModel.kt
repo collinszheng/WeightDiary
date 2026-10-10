@@ -36,15 +36,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-/**
- * 顶栏那个转圈的最短可见时长。
- *
- * 同步本身常常只要几十毫秒 —— 在模拟器上连拍 8 帧、一帧都没落在同步窗口里，
- * 也就是说点下去只会「闪一下」，用户会以为根本没反应。短于这个值时把
- * 「正在同步」多留一会儿，让「在动」真的看得见。
- */
-private const val MIN_SYNC_FEEDBACK_MS = 450L
-
 class HomeViewModel(
     private val repository: WeightRepository,
     private val backup: RecordBackup,
@@ -212,7 +203,10 @@ class HomeViewModel(
             val startedAt = System.nanoTime()
             val outcome = syncCoordinator.sync()
             val spentMs = (System.nanoTime() - startedAt) / 1_000_000
-            if (spentMs < MIN_SYNC_FEEDBACK_MS) delay(MIN_SYNC_FEEDBACK_MS - spentMs)
+            // 补足到整数圈：同步常常只要几十毫秒，短于一圈就会「闪一下」看不见；
+            // 而补到半圈收尾又会让图标在转的中途被拽回原位。见 syncFeedbackMs
+            val targetMs = syncFeedbackMs(spentMs)
+            if (spentMs < targetMs) delay(targetMs - spentMs)
             syncing.value = false
 
             when (outcome) {

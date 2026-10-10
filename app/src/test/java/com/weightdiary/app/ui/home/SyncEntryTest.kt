@@ -6,13 +6,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 「实验功能」开启之后到底会发生什么 —— 全部规则都在两个纯函数里，不需要设备。
+ * 「实验功能」开启之后到底会发生什么 —— 全部规则都在几个纯函数里，不需要设备。
  *
- * 这里守的是**顺序**与**静默**：
+ * 这里守的是**顺序**、**静默**与**可见性**：
  *  - 缺锚点要排在授权之前（否则第一次同步会把一家人的数据吞进来，`docs/08` §6.2）；
- *  - 冷启动自动同步的前提不满足时一律静默跳过，不能弹窗打断启动。
+ *  - 冷启动自动同步的前提不满足时一律静默跳过，不能弹窗打断启动；
+ *  - 「正在同步」必须持续**整数圈**：短于一圈用户看不见，不是整数圈图标会在半途被拽回原位。
  *
- * 这两条都是行为规则，不是实现细节 —— 改它们等于改行为。
+ * 这些都是行为规则，不是实现细节 —— 改它们等于改行为。
  */
 class SyncEntryTest {
 
@@ -93,5 +94,36 @@ class SyncEntryTest {
     @Test
     fun `库里还没有记录时静默跳过 - 不在启动时弹引导表单`() {
         assertFalse(canAutoSyncOnLaunch(true, SyncAvailabilityUi.AVAILABLE, true, false))
+    }
+
+    // ─────────────── syncFeedbackMs ───────────────
+
+    @Test
+    fun `比一圈快时补足一整圈 - 否则点下去只会闪一下看不见`() {
+        assertEquals(SYNC_SPIN_TURN_MS, syncFeedbackMs(0))
+        assertEquals(SYNC_SPIN_TURN_MS, syncFeedbackMs(30))
+    }
+
+    @Test
+    fun `刚好整数圈时不额外等待`() {
+        assertEquals(SYNC_SPIN_TURN_MS, syncFeedbackMs(SYNC_SPIN_TURN_MS))
+        assertEquals(SYNC_SPIN_TURN_MS * 2, syncFeedbackMs(SYNC_SPIN_TURN_MS * 2))
+    }
+
+    @Test
+    fun `凑不满一圈时补到下一圈 - 转半圈就被拽回原位很突兀`() {
+        assertEquals(SYNC_SPIN_TURN_MS * 2, syncFeedbackMs(SYNC_SPIN_TURN_MS + 1))
+        assertEquals(SYNC_SPIN_TURN_MS * 3, syncFeedbackMs(SYNC_SPIN_TURN_MS * 2 + 1))
+    }
+
+    @Test
+    fun `多等的永远是这一圈的剩余部分 - 不会超过一圈`() {
+        for (spent in listOf(0L, 449L, 450L, 451L, 899L, 900L, 901L, 12_345L)) {
+            val feedback = syncFeedbackMs(spent)
+            assertTrue("$spent → $feedback 不足一圈", feedback >= SYNC_SPIN_TURN_MS)
+            assertEquals("$spent → $feedback 不是整数圈", 0L, feedback % SYNC_SPIN_TURN_MS)
+            // spent = 0 是最短一圈那条规则在兜底，多等的正好是一整圈；其余情况补的是零头
+            assertTrue("$spent → $feedback 多等了不止一圈", feedback - spent <= SYNC_SPIN_TURN_MS)
+        }
     }
 }
